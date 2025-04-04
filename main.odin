@@ -87,27 +87,26 @@ generate :: proc(p: Pattern, symmetric: bool = false) -> [dynamic]SizedPattern {
   return res2
 }
 
-three_p_1 := [3]Pattern{{0, 0}, {1, 1}, {0, 2}}
-three_p_2 := [3]Pattern{{1, 0}, {0, 1}, {0, 2}}
-three_p_3 := [3]Pattern{{0, 0}, {0, 1}, {0, 3}}
-four_p := [4]Pattern{{0, 0}, {1, 1}, {0, 2}, {0, 3}}
-five_p_1 := [5]Pattern{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
-five_p_2 := [5]Pattern{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
+three_p_1: Pattern = {{0, 0}, {1, 1}, {0, 2}}
+three_p_2: Pattern = {{1, 0}, {0, 1}, {0, 2}}
+three_p_3: Pattern = {{0, 0}, {0, 1}, {0, 3}}
+four_p: Pattern = {{0, 0}, {1, 1}, {0, 2}, {0, 3}}
+five_p_1: Pattern = {{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
+five_p_2: Pattern = {{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
 //
-//const std::vector<SizedPattern> threes1 = generate(three_p_1)
-//const std::vector<SizedPattern> threes2 = generate(three_p_2)
-//const std::vector<SizedPattern> threes3 = generate(three_p_3)
-//const std::vector<SizedPattern> fours = generate(four_p)
-//const std::vector<SizedPattern> fives1 = generate(five_p_1)
-//const std::vector<SizedPattern> fives2 = generate(five_p_2)
-//const std::vector<SizedPattern> threes = []() {
-//  std::vector<SizedPattern> res
-//  res.reserve(threes1.size() + threes2.size() + threes3.size())
-//  res.insert(res.end(), threes1.begin(), threes1.end())
-//  res.insert(res.end(), threes2.begin(), threes2.end())
-//  res.insert(res.end(), threes3.begin(), threes3.end())
-//  return res
-//}()
+threes1 := generate(three_p_1)
+threes2 := generate(three_p_2)
+threes3 := generate(three_p_3)
+fours := generate(four_p)
+fives1 := generate(five_p_1)
+fives2 := generate(five_p_2)
+threes :: proc() -> [dynamic]SizedPattern {
+  res := make([dynamic]SizedPattern, len(threes1) + len(threes2) + len(threes3))
+  copy(res[:], threes1[:])
+  copy(res[len(threes1):], threes2[:])
+  copy(res[len(threes1) + len(threes3):], threes3[:])
+  return res
+}
 //const std::vector<SizedPattern> patterns = []() {
 //  std::vector<SizedPattern> res
 //  res.reserve(fours.size() + fives1.size() + fives2.size())
