@@ -4,9 +4,10 @@ package main
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
+import "core:slice"
 import rl "vendor:raylib"
 
-Point :: distinct rl.Vector2
+Point :: distinct [2]int
 
 Pattern :: distinct [dynamic]Point
 
@@ -17,8 +18,8 @@ SizedPattern :: struct {
 }
 
 shift :: proc(p: Pattern) -> Pattern {
-  minX := max(f32)
-  minY := max(f32)
+  minX := max(int)
+  minY := max(int)
   for &pt in p {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
@@ -56,8 +57,8 @@ mirrored :: proc(p: Pattern) -> Pattern {
 sized :: proc(p: Pattern) -> SizedPattern {
   res: SizedPattern
   res.pat = p
-  maxX := min(f32)
-  maxY := min(f32)
+  maxX := min(int)
+  maxY := min(int)
   for &pt in p {
     maxX = max(pt.x, maxX)
     maxY = max(pt.y, maxY)
@@ -84,6 +85,7 @@ generate :: proc(p: Pattern, symmetric: bool = false) -> [dynamic]SizedPattern {
   for pt in res1 {
     append(&res2, sized(pt))
   }
+  delete(res1)
   return res2
 }
 
@@ -100,497 +102,535 @@ threes3 := generate(three_p_3)
 fours := generate(four_p)
 fives1 := generate(five_p_1)
 fives2 := generate(five_p_2)
-threes :: proc() -> [dynamic]SizedPattern {
+threes_f :: proc() -> [dynamic]SizedPattern {
   res := make([dynamic]SizedPattern, len(threes1) + len(threes2) + len(threes3))
   copy(res[:], threes1[:])
   copy(res[len(threes1):], threes2[:])
   copy(res[len(threes1) + len(threes3):], threes3[:])
   return res
 }
-//const std::vector<SizedPattern> patterns = []() {
-//  std::vector<SizedPattern> res
-//  res.reserve(fours.size() + fives1.size() + fives2.size())
-//  res.insert(res.end(), fours.begin(), fours.end())
-//  res.insert(res.end(), fives1.begin(), fives1.end())
-//  res.insert(res.end(), fives2.begin(), fives2.end())
-//  return res
-//}()
-//
-//class Board {
-//  std::vector<int> board
-//  std::default_random_engine e1{static_cast<unsigned>(
-//      std::chrono::system_clock::now().time_since_epoch().count())}
-//  std::uniform_int_distribution<int> uniform_dist{1, 6}
-//  std::uniform_int_distribution<int> uniform_dist_2
-//  std::uniform_int_distribution<int> uniform_dist_3
-//  std::uniform_int_distribution<int> coin{1, 42}
-//  std::uniform_int_distribution<int> coin2{1, 69}
-//
-//  size_t w
-//  size_t h
-//  std::set<std::pair<int, int>> matched_patterns
-//  std::set<std::pair<int, int>> matched_threes
-//  std::set<std::pair<int, int>> magic_tiles
-//  std::set<std::pair<int, int>> magic_tiles2
-//  std::vector<std::tuple<int, int, int>> rm_i
-//  std::vector<std::tuple<int, int, int>> rm_j
-//  std::vector<std::pair<int, int>> rm_b
-//
-//public:
-//  int width() { return w; }
-//  int height() { return h; }
-//  int score{}
-//  int normals{}
-//  int longers{}
-//  int longests{}
-//  int crosses{}
-//  Board(size_t _w, size_t _h) : w{_w}, h{_h} {
-//    board.resize(w * h)
-//    std::fill(std::begin(board), std::end(board), 0)
-//    uniform_dist_2 = std::uniform_int_distribution<int>(0, w - 1)
-//    uniform_dist_3 = std::uniform_int_distribution<int>(0, h - 1)
-//  }
-//  Board(const Board &b) {
-//    w = b.w
-//    h = b.h
-//    board = b.board
-//    score = b.score
-//    matched_patterns = b.matched_patterns
-//    magic_tiles = b.magic_tiles
-//    magic_tiles2 = b.magic_tiles2
-//  }
-//  Board operator=(const Board &b) {
-//    w = b.w
-//    h = b.h
-//    board = b.board
-//    score = b.score
-//    matched_patterns = b.matched_patterns
-//    magic_tiles = b.magic_tiles
-//    magic_tiles2 = b.magic_tiles2
-//    return *this
-//  }
-//  friend bool operator==(const Board &a, const Board &b)
-//  friend std::ostream &operator<<(std::ostream &of, const Board &b)
-//  friend std::istream &operator>>(std::istream &in, Board &b)
-//  bool match_pattern(int x, int y, const SizedPattern &p) {
-//    int color = at(x + p.pat[0].x(), y + p.pat[0].y())
-//    for (auto i = 1u; i < p.pat.size(); ++i) {
-//      if (color != at(x + p.pat[i].x(), y + p.pat[i].y())) {
-//        return false
-//      }
-//    }
-//    return true
-//  }
-//  void match_patterns() {
-//    matched_patterns.clear()
-//    for (const SizedPattern &sp : patterns) {
-//      for (int i = 0; i <= w - sp.w; ++i) {
-//        for (int j = 0; j <= h - sp.h; ++j) {
-//          if (match_pattern(i, j, sp)) {
-//            for (const Point &p : sp.pat) {
-//              matched_patterns.insert({i + p.x(), j + p.y()})
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
-//  bool is_matched(int x, int y) { return matched_patterns.contains({x, y}); }
-//  bool is_magic(int x, int y) { return magic_tiles.contains({x, y}); }
-//  bool is_magic2(int x, int y) { return magic_tiles2.contains({x, y}); }
-//  void swap(int x1, int y1, int x2, int y2) {
-//    auto tmp = at(x1, y1)
-//    at(x1, y1) = at(x2, y2)
-//    at(x2, y2) = tmp
-//
-//    if (is_magic(x1, y1)) {
-//      magic_tiles.erase({x1, y1})
-//      magic_tiles.insert({x2, y2})
-//    }
-//
-//    if (is_magic(x2, y2)) {
-//      magic_tiles.erase({x2, y2})
-//      magic_tiles.insert({x1, y1})
-//    }
-//
-//    if (is_magic2(x1, y1)) {
-//      magic_tiles2.erase({x1, y1})
-//      magic_tiles2.insert({x2, y2})
-//    }
-//
-//    if (is_magic2(x2, y2)) {
-//      magic_tiles2.erase({x2, y2})
-//      magic_tiles2.insert({x1, y1})
-//    }
-//  }
-//  void fill() {
-//    for (auto &x : board) {
-//      x = uniform_dist(e1)
-//    }
-//  }
-//  int &at(int a, int b) { return board[a * h + b]; }
-//  int at(int a, int b) const { return board[a * h + b]; }
-//  bool reasonable_coord(int i, int j) {
-//    return i >= 0 && i < w && j >= 0 && j < h
-//  }
-//  void remove_trios() {
-//    std::vector<std::tuple<int, int, int>> remove_i
-//    std::vector<std::tuple<int, int, int>> remove_j
-//    for (int i = 0; i < w; ++i) {
-//      for (int j = 0; j < h; ++j) {
-//        int offset_j = 1
-//        int offset_i = 1
-//        while (j + offset_j < h && at(i, j) == at(i, j + offset_j)) {
-//          offset_j += 1
-//        }
-//        if (offset_j > 2) {
-//          remove_i.push_back({i, j, offset_j})
-//        }
-//        while (i + offset_i < w && at(i, j) == at(i + offset_i, j)) {
-//          offset_i += 1
-//        }
-//        if (offset_i > 2) {
-//          remove_j.push_back({i, j, offset_i})
-//        }
-//      }
-//    }
-//    for (auto t : remove_i) {
-//      int i = std::get<0>(t)
-//      int j = std::get<1>(t)
-//      int offset = std::get<2>(t)
-//      if (offset == 4) {
-//        j = 0
-//        offset = h
-//        longers += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      for (int jj = j; jj < j + offset; ++jj) {
-//        at(i, jj) = 0
-//        if (is_magic(i, jj)) {
-//          score -= 3
-//          magic_tiles.erase({i, jj})
-//        }
-//        if (is_magic2(i, jj)) {
-//          score += 3
-//          magic_tiles2.erase({i, jj})
-//        }
-//        score += 1
-//      }
-//      if (offset == 5) {
-//        for (int i = 0; i < w; ++i) {
-//          at(uniform_dist_2(e1), uniform_dist_3(e1)) = 0
-//          score += 1
-//        }
-//        longests += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      normals += 1
-//    }
-//    for (auto t : remove_j) {
-//      int i = std::get<0>(t)
-//      int j = std::get<1>(t)
-//      int offset = std::get<2>(t)
-//      if (offset == 4) {
-//        i = 0
-//        offset = w
-//        longers += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      for (int ii = i; ii < i + offset; ++ii) {
-//        at(ii, j) = 0
-//        if (is_magic(ii, j)) {
-//          score -= 3
-//          magic_tiles.erase({ii, j})
-//        }
-//        if (is_magic2(ii, j)) {
-//          score += 3
-//          magic_tiles2.erase({ii, j})
-//        }
-//        score += 1
-//      }
-//      if (offset == 5) {
-//        for (int i = 0; i < w; ++i) {
-//          at(uniform_dist_2(e1), uniform_dist_3(e1)) = 0
-//          score += 1
-//        }
-//        longests += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      normals += 1
-//    }
-//    for (int i = 0; i < int(remove_i.size()); ++i) {
-//      for (int j = 0; j < int(remove_j.size()); ++j) {
-//        auto t1 = remove_i[i]
-//        auto t2 = remove_j[j]
-//        auto i1 = std::get<0>(t1)
-//        auto j1 = std::get<1>(t1)
-//        auto o1 = std::get<2>(t1)
-//        auto i2 = std::get<0>(t2)
-//        auto j2 = std::get<1>(t2)
-//        auto o2 = std::get<2>(t2)
-//        if (i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1)) {
-//          for (int m = -1; m < 2; ++m) {
-//            for (int n = -1; n < 2; ++n) {
-//              if (reasonable_coord(i1 + m, j1 + n)) {
-//                at(i1 + m, j1 + n) = 0
-//                score += 1
-//              }
-//            }
-//          }
-//          crosses += 1
-//          normals = std::max(0, normals - 2)
-//        }
-//      }
-//    }
-//  }
-//  void fill_up() {
-//    int curr_i = -1
-//    for (int i = 0; i < w; ++i) {
-//      for (int j = 0; j < h; ++j) {
-//        if (at(i, j) == 0) {
-//          curr_i = i
-//          while (curr_i < w - 1 && at(curr_i + 1, j) == 0) {
-//            curr_i += 1
-//          }
-//          for (int k = curr_i; k >= 0; --k) {
-//            if (at(k, j) != 0) {
-//              at(curr_i, j) = at(k, j)
-//              if (is_magic(k, j)) {
-//                magic_tiles.erase({k, j})
-//                magic_tiles.insert({curr_i, j})
-//              }
-//              if (is_magic2(k, j)) {
-//                magic_tiles2.erase({k, j})
-//                magic_tiles2.insert({curr_i, j})
-//              }
-//              curr_i -= 1
-//            }
-//          }
-//          for (int k = curr_i; k >= 0; --k) {
-//            at(k, j) = uniform_dist(e1)
-//            if (coin(e1) == 1) {
-//              magic_tiles.insert({k, j})
-//            }
-//            if (coin2(e1) == 1) {
-//              magic_tiles2.insert({k, j})
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
-//  void stabilize() {
-//    auto old_board = *this
-//    do {
-//      old_board = *this
-//      remove_trios()
-//      fill_up()
-//    } while (!(*this == old_board))
-//    match_patterns()
-//    match_threes()
-//  }
-//  void step() {
-//    remove_trios()
-//    fill_up()
-//    match_patterns()
-//    match_threes()
-//  }
-//  void zero() {
-//    score = 0
-//    normals = 0
-//    longers = 0
-//    longests = 0
-//    crosses = 0
-//  }
-//  // New interface starts here
-//  std::vector<std::tuple<int, int, int>> remove_one_thing() {
-//    std::vector<std::tuple<int, int, int>> res
-//    if (!rm_i.empty()) {
-//      auto t = rm_i.back()
-//      int i = std::get<0>(t)
-//      int j = std::get<1>(t)
-//      int offset = std::get<2>(t)
-//      if (offset == 4) {
-//        j = 0
-//        offset = h
-//        longers += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      for (int jj = j; jj < j + offset; ++jj) {
-//        res.emplace_back(i, jj, at(i, jj))
-//        at(i, jj) = 0
-//        if (is_magic(i, jj)) {
-//          score -= 3
-//          magic_tiles.erase({i, jj})
-//        }
-//        if (is_magic2(i, jj)) {
-//          score += 3
-//          magic_tiles2.erase({i, jj})
-//        }
-//        score += 1
-//      }
-//      if (offset == 5) {
-//        std::set<std::pair<int, int>> r
-//        for (int i = 0; i < w; ++i) {
-//          int x, y
-//          do {
-//            x = uniform_dist_2(e1)
-//            y = uniform_dist_3(e1)
-//          } while (r.contains({x, y}))
-//          r.insert({x, y})
-//          res.emplace_back(x, y, at(x, y))
-//          at(x, y) = 0
-//          score += 1
-//        }
-//        longests += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      normals += 1
-//      rm_i.pop_back()
-//      return res
-//    }
-//    if (!rm_j.empty()) {
-//      auto t = rm_j.back()
-//      int i = std::get<0>(t)
-//      int j = std::get<1>(t)
-//      int offset = std::get<2>(t)
-//      if (offset == 4) {
-//        i = 0
-//        offset = w
-//        longers += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      for (int ii = i; ii < i + offset; ++ii) {
-//        res.emplace_back(ii, j, at(ii, j))
-//        at(ii, j) = 0
-//        if (is_magic(ii, j)) {
-//          score -= 3
-//          magic_tiles.erase({ii, j})
-//        }
-//        if (is_magic2(ii, j)) {
-//          score += 3
-//          magic_tiles2.erase({ii, j})
-//        }
-//        score += 1
-//      }
-//      if (offset == 5) {
-//        std::set<std::pair<int, int>> r
-//        for (int i = 0; i < w; ++i) {
-//          int x, y
-//          do {
-//            x = uniform_dist_2(e1)
-//            y = uniform_dist_3(e1)
-//          } while (r.contains({x, y}))
-//          r.insert({x, y})
-//          res.emplace_back(x, y, at(x, y))
-//          at(x, y) = 0
-//          score += 1
-//        }
-//        longests += 1
-//        normals = std::max(0, normals - 1)
-//      }
-//      normals += 1
-//      rm_j.pop_back()
-//      return res
-//    }
-//    if (!rm_b.empty()) {
-//      auto t = rm_b.back()
-//      int i = std::get<0>(t)
-//      int j = std::get<1>(t)
-//      for (int m = -2; m < 3; ++m) {
-//        for (int n = -2; n < 3; ++n) {
-//          if (reasonable_coord(i + m, j + n)) {
-//            res.emplace_back(i + m, j + n, at(i + m, j + n))
-//            at(i + m, j + n) = 0
-//            score += 1
-//          }
-//        }
-//      }
-//      crosses += 1
-//      normals = std::max(0, normals - 2)
-//      rm_b.pop_back()
-//      return res
-//    }
-//    return res
-//  }
-//  void prepare_removals() {
-//    rm_i.clear()
-//    rm_j.clear()
-//    rm_b.clear()
-//    matched_patterns.clear()
-//    matched_threes.clear()
-//    for (int i = 0; i < w; ++i) {
-//      for (int j = 0; j < h; ++j) {
-//        int offset_j = 1
-//        int offset_i = 1
-//        while (j + offset_j < h && at(i, j) == at(i, j + offset_j)) {
-//          offset_j += 1
-//        }
-//        if (offset_j > 2) {
-//          rm_i.emplace_back(i, j, offset_j)
-//        }
-//        while (i + offset_i < w && at(i, j) == at(i + offset_i, j)) {
-//          offset_i += 1
-//        }
-//        if (offset_i > 2) {
-//          rm_j.emplace_back(i, j, offset_i)
-//        }
-//      }
-//    }
-//    for (int i = 0; i < int(rm_i.size()); ++i) {
-//      for (int j = 0; j < int(rm_j.size()); ++j) {
-//        auto t1 = rm_i[i]
-//        auto t2 = rm_j[j]
-//        auto i1 = std::get<0>(t1)
-//        auto j1 = std::get<1>(t1)
-//        auto o1 = std::get<2>(t1)
-//        auto i2 = std::get<0>(t2)
-//        auto j2 = std::get<1>(t2)
-//        auto o2 = std::get<2>(t2)
-//        if (i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1)) {
-//          rm_b.emplace_back(i1, j2)
-//        }
-//      }
-//    }
-//    auto sorter = [](auto &t1, auto &t2) {
-//      auto i1 = std::get<0>(t1)
-//      auto i2 = std::get<0>(t2)
-//      return i1 > i2
-//    }
-//    std::sort(std::begin(rm_i), std::end(rm_i), sorter)
-//    std::sort(std::begin(rm_j), std::end(rm_j), sorter)
-//    std::sort(std::begin(rm_b), std::end(rm_b), sorter)
-//  }
-//  bool has_removals() { return rm_i.size() + rm_j.size() + rm_b.size(); }
-//  void match_threes() {
-//    matched_threes.clear()
-//    for (const SizedPattern &sp : threes) {
-//      for (int i = 0; i <= w - sp.w; ++i) {
-//        for (int j = 0; j <= h - sp.h; ++j) {
-//          if (match_pattern(i, j, sp)) {
-//            for (const Point &p : sp.pat) {
-//              matched_threes.insert({i + p.x(), j + p.y()})
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
-//  bool is_three(int i, int j) { return matched_threes.contains({i, j}); }
-//}
-//
-//bool operator==(const Board &a, const Board &b) {
-//  if (a.w != b.w || a.h != b.h) {
-//    return false
-//  }
-//  for (int i = 0; i < a.w * a.h; ++i) {
-//    if (a.board[i] != b.board[i]) {
-//      return false
-//    }
-//  }
-//  return true
-//}
-//
+threes := threes_f()
+patterns_f :: proc() -> [dynamic]SizedPattern {
+  res := make([dynamic]SizedPattern, len(fours) + len(fives1) + len(fives2))
+  copy(res[:], fours[:])
+  copy(res[len(fours):], fives1[:])
+  copy(res[len(fours) + len(fives1):], fives2[:])
+  return res
+}
+patterns := patterns_f()
+Pair :: struct {
+  first:  int,
+  second: int,
+}
+Triple :: struct {
+  first:  int,
+  second: int,
+  third:  int,
+}
+Board :: struct {
+  board:            [dynamic]int,
+  w:                int,
+  h:                int,
+  matched_patterns: map[Pair]struct {},
+  matched_threes:   map[Pair]struct {},
+  magic_tiles:      map[Pair]struct {},
+  magic_tiles2:     map[Pair]struct {},
+  rm_i:             [dynamic]Triple,
+  rm_j:             [dynamic]Triple,
+  rm_b:             [dynamic]Pair,
+  score:            int,
+  normals:          int,
+  longers:          int,
+  longests:         int,
+  crosses:          int,
+}
+coin :: proc() -> int {
+  return rand.int_max(42) + 1
+}
+coin2 :: proc() -> int {
+  return rand.int_max(69) + 1
+}
+uniform_dist :: proc() -> int {
+  return rand.int_max(6) + 1
+}
+uniform_dist_2 :: proc(b: Board) -> int {
+  return rand.int_max(b.w)
+}
+uniform_dist_3 :: proc(b: Board) -> int {
+  return rand.int_max(b.h)
+}
+make_board :: proc(w, h: int) -> Board {
+  b: Board
+  b.w = w
+  b.h = h
+  b.board = make([dynamic]int, w * h)
+  b.matched_patterns = make(map[Pair]struct {})
+  b.matched_threes = make(map[Pair]struct {})
+  b.magic_tiles = make(map[Pair]struct {})
+  b.magic_tiles2 = make(map[Pair]struct {})
+  return b
+}
+delete_board :: proc(b: ^Board) {
+  delete(b.board)
+  delete(b.matched_patterns)
+  delete(b.matched_threes)
+  delete(b.magic_tiles)
+  delete(b.magic_tiles2)
+}
+copy_set :: proc(m: map[Pair]struct {}) -> map[Pair]struct {} {
+  m1 := make(map[Pair]struct {}, len(m))
+  for k, _ in m {
+    m1[k] = {}
+  }
+  return m1
+}
+copy_board :: proc(b: Board) -> Board {
+  b1 := make_board(b.w, b.h)
+  copy(b1.board[:], b.board[:])
+  b1.score = b.score
+  b1.matched_patterns = copy_set(b.matched_patterns)
+  b1.magic_tiles = copy_set(b.magic_tiles)
+  b1.magic_tiles2 = copy_set(b.magic_tiles2)
+  return b1
+}
+at :: proc(brd: Board, a, b: int) -> int {
+  return brd.board[a * brd.h + b]
+}
+set_at :: proc(brd: ^Board, a, b, v: int) {
+  brd.board[a * brd.h + b] = v
+}
+match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
+  color := at(b, x + p.pat[0].x, y + p.pat[0].y)
+  for i := 1; i < len(p.pat); i += 1 {
+    if color == at(b, x + p.pat[i].x, y + p.pat[i].y) {
+      return false
+    }
+  }
+  return true
+}
+match_patterns :: proc(b: ^Board) {
+  clear(&b.matched_patterns)
+  for sp in patterns {
+    for i := 0; i <= b.w - sp.w; i += 1 {
+      for j := 0; j <= b.h - sp.h; j += 1 {
+        if match_pattern(b^, i, j, sp) {
+          for p in sp.pat {
+            b.matched_patterns[{i + p.x, j + p.y}] = {}
+          }
+        }
+      }
+    }
+  }
+}
+is_matched :: proc(b: Board, x, y: int) -> bool {
+  return {x, y} in b.matched_patterns
+}
+is_magic :: proc(b: Board, x, y: int) -> bool {
+  return {x, y} in b.magic_tiles
+}
+is_magic2 :: proc(b: Board, x, y: int) -> bool {
+  return {x, y} in b.magic_tiles2
+}
+swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
+  tmp := at(b^, x1, y1)
+  set_at(b, x1, y1, at(b^, x2, y2))
+  set_at(b, x2, y2, tmp)
+
+  if is_magic(b^, x1, y1) {
+    delete_key(&b.magic_tiles, Pair{x1, y1})
+    b.magic_tiles[{x2, y2}] = {}
+  }
+  if is_magic(b^, x2, y2) {
+    delete_key(&b.magic_tiles, Pair{x2, y2})
+    b.magic_tiles[{x1, y1}] = {}
+  }
+  if is_magic2(b^, x1, y1) {
+    delete_key(&b.magic_tiles2, Pair{x1, y1})
+    b.magic_tiles2[{x2, y2}] = {}
+  }
+  if is_magic2(b^, x2, y2) {
+    delete_key(&b.magic_tiles2, Pair{x2, y2})
+    b.magic_tiles2[{x1, y1}] = {}
+  }
+}
+fill :: proc(b: ^Board) {
+  for &x in b.board {
+    x = uniform_dist()
+  }
+}
+reasonable_coord :: proc(b: Board, i, j: int) -> bool {
+  return i >= 0 && i < b.w && j >= 0 && j < b.h
+}
+remove_trios :: proc(b: ^Board) {
+  remove_i := make([dynamic]Triple)
+  remove_j := make([dynamic]Triple)
+  for i := 0; i < b.w; i += 1 {
+    for j := 0; j < b.h; j += 1 {
+      offset_i := 1
+      offset_j := 1
+      for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) {
+        offset_j += 1
+      }
+      if offset_j > 2 {
+        append(&remove_i, Triple{i, j, offset_j})
+      }
+      for (i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j)) {
+        offset_i += 1
+      }
+      if offset_i > 2 {
+        append(&remove_j, Triple{i, j, offset_i})
+      }
+    }
+  }
+  for t in remove_i {
+    i := t.first
+    j := t.second
+    offset := t.third
+    if offset == 4 {
+      j = 0
+      offset = b.h
+      b.longers += 1
+      b.normals += max(0, b.normals - 1)
+    }
+    for jj := j; jj < j + offset; jj += 1 {
+      set_at(b, i, jj, 0)
+      if is_magic(b^, i, jj) {
+        b.score -= 3
+        delete_key(&b.magic_tiles, Pair{i, jj})
+      }
+      if is_magic2(b^, i, jj) {
+        b.score += 3
+        delete_key(&b.magic_tiles2, Pair{i, jj})
+      }
+      b.score += 1
+    }
+    if offset == 5 {
+      for i := 0; i < b.w; i += 1 {
+        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^), 0)
+        b.score += 1
+      }
+      b.longests += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    b.normals += 1
+  }
+  for t in remove_j {
+    i := t.first
+    j := t.second
+    offset := t.third
+    if offset == 4 {
+      i = 0
+      offset = b.w
+      b.longers += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    for ii := i; ii < i + offset; ii += 1 {
+      set_at(b, ii, j, 0)
+      if is_magic(b^, ii, j) {
+        b.score -= 3
+        delete_key(&b.magic_tiles, Pair{ii, j})
+      }
+      if is_magic2(b^, ii, j) {
+        b.score += 3
+        delete_key(&b.magic_tiles2, Pair{ii, j})
+      }
+      b.score += 1
+    }
+    if offset == 5 {
+      for i := 0; i < b.w; i += 1 {
+        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^), 0)
+        b.score += 1
+      }
+      b.longests += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    b.normals += 1
+  }
+  for i := 0; i < len(remove_i); i += 1 {
+    for j := 0; j < len(remove_j); j += 1 {
+      t1 := remove_i[i]
+      t2 := remove_j[j]
+      i1 := t1.first
+      j1 := t1.second
+      o1 := t1.third
+      i2 := t2.first
+      j2 := t2.second
+      o2 := t2.third
+      if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
+        for m := -1; m < 2; m += 1 {
+          for n := -1; n < 2; n += 1 {
+            if reasonable_coord(b^, i1 + m, j1 + n) {
+              set_at(b, i1 + m, j1 + n, 0)
+              b.score += 1
+            }
+          }
+        }
+        b.crosses += 1
+        b.normals = max(0, b.normals - 2)
+      }
+    }
+  }
+}
+fill_up :: proc(b: ^Board) {
+  curr_i := -1
+  for i := 0; i < b.w; i += 1 {
+    for j := 0; j < b.h; j += 1 {
+      if at(b^, i, j) == 0 {
+        curr_i = i
+        for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == 0 {
+          curr_i += 1
+        }
+        for k := curr_i; k >= 0; k -= 1 {
+          if at(b^, k, j) != 0 {
+            set_at(b, curr_i, j, at(b^, k, j))
+            if is_magic(b^, k, j) {
+              delete_key(&b.magic_tiles, Pair{k, j})
+              b.magic_tiles[{curr_i, j}] = {}
+            }
+            if is_magic2(b^, k, j) {
+              delete_key(&b.magic_tiles2, Pair{k, j})
+              b.magic_tiles2[{curr_i, j}] = {}
+            }
+            curr_i -= 1
+          }
+        }
+        for k := curr_i; k >= 0; k -= 1 {
+          set_at(b, k, j, uniform_dist())
+          if coin() == 1 {
+            b.magic_tiles[{k, j}] = {}
+          }
+          if coin2() == 1 {
+            b.magic_tiles2[{k, j}] = {}
+          }
+        }
+      }
+    }
+  }
+}
+compare_boards :: proc(b1: Board, b2: Board) -> bool {
+  if b1.w != b2.w || b1.h != b2.h {
+    return false
+  }
+  for i := 0; i < b1.w * b1.h; i += 1 {
+    if b1.board[i] != b2.board[i] {
+      return false
+    }
+  }
+  return true
+}
+match_threes :: proc(b: ^Board) {
+  clear(&b.matched_threes)
+  for sp in threes {
+    for i := 0; i <= b.w - sp.w; i += 1 {
+      for j := 0; j <= b.h - sp.h; j += 1 {
+        if match_pattern(b^, i, j, sp) {
+          for p in sp.pat {
+            b.matched_threes[{i + p.x, j + p.y}] = {}
+          }
+        }
+      }
+    }
+  }
+}
+is_three :: proc(b: Board, i, j: int) -> bool {
+  return {i, j} in b.matched_threes
+}
+stabilize :: proc(b: ^Board) {
+  for {
+    old_board := copy_board(b^)
+    defer delete_board(&old_board)
+    remove_trios(b)
+    fill_up(b)
+    if compare_boards(old_board, b^) {
+      break
+    }
+  }
+  match_patterns(b)
+  match_threes(b)
+}
+step :: proc(b: ^Board) {
+  remove_trios(b)
+  fill_up(b)
+  match_patterns(b)
+  match_threes(b)
+}
+zero :: proc(b: ^Board) {
+  b.score = 0
+  b.normals = 0
+  b.longers = 0
+  b.longests = 0
+  b.crosses = 0
+}
+// New interface starts here
+
+remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
+  res := make([dynamic]Triple)
+  if len(b.rm_i) != 0 {
+    t := b.rm_i[len(b.rm_i) - 1]
+    i := t.first
+    j := t.second
+    offset := t.third
+    if offset == 4 {
+      j = 0
+      offset = b.h
+      b.longers += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    for jj := j; jj < j + offset; jj += 1 {
+      append(&res, Triple{i, jj, at(b^, i, jj)})
+      set_at(b, i, jj, 0)
+      if is_magic(b^, i, jj) {
+        b.score -= 3
+        delete_key(&b.magic_tiles, Pair{i, jj})
+      }
+      if is_magic2(b^, i, jj) {
+        b.score += 3
+        delete_key(&b.magic_tiles2, Pair{i, jj})
+      }
+      b.score += 1
+    }
+    if offset == 5 {
+      r := make(map[Pair]struct {})
+      for i := 0; i < b.w; i += 1 {
+        x, y: int
+        for {
+          x = uniform_dist_2(b^)
+          y = uniform_dist_3(b^)
+          if ({x, y} in r) {
+            break
+          }
+        }
+        r[{x, y}] = {}
+        append(&res, Triple{x, y, at(b^, x, y)})
+        set_at(b, x, y, 0)
+        b.score += 1
+      }
+      b.longests += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    b.normals += 1
+    pop(&b.rm_i)
+    return res
+  }
+  if len(b.rm_j) != 0 {
+    t := b.rm_j[len(b.rm_j) - 1]
+    i := t.first
+    j := t.second
+    offset := t.third
+    if offset == 4 {
+      i = 0
+      offset = b.w
+      b.longers += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    for ii := i; ii < i + offset; ii += 1 {
+      append(&res, Triple{ii, j, at(b^, ii, j)})
+      set_at(b, ii, j, 0)
+      if is_magic(b^, ii, j) {
+        b.score -= 3
+        delete_key(&b.magic_tiles, Pair{ii, j})
+      }
+      if is_magic2(b^, ii, j) {
+        b.score += 3
+        delete_key(&b.magic_tiles2, Pair{ii, j})
+      }
+      b.score += 1
+    }
+    if offset == 5 {
+      r := make(map[Pair]struct {})
+      for i := 0; i < b.w; i += 1 {
+        x, y: int
+        for {
+          x = uniform_dist_2(b^)
+          y = uniform_dist_3(b^)
+          if ({x, y} in r) {
+            break
+          }
+        }
+        r[{x, y}] = {}
+        append(&res, Triple{x, y, at(b^, x, y)})
+        set_at(b, x, y, 0)
+        b.score += 1
+      }
+      b.longests += 1
+      b.normals = max(0, b.normals - 1)
+    }
+    b.normals += 1
+    pop(&b.rm_j)
+    return res
+  }
+  if len(b.rm_b) != 0 {
+    t := b.rm_b[len(b.rm_b) - 1]
+    i := t.first
+    j := t.second
+    for m := -2; m < 3; m += 1 {
+      for n := -2; n < 3; n += 1 {
+        if reasonable_coord(b^, i + m, j + n) {
+          append(&res, Triple{i + m, j + n, at(b^, i + m, j + n)})
+          set_at(b, i + m, j + n, 0)
+          b.score += 1
+        }
+      }
+    }
+    b.crosses += 1
+    b.normals = max(0, b.normals - 2)
+    pop(&b.rm_b)
+    return res
+  }
+  return res
+}
+prepare_removals :: proc(b: ^Board) {
+  clear(&b.rm_i)
+  clear(&b.rm_j)
+  clear(&b.rm_b)
+  clear(&b.matched_patterns)
+  clear(&b.matched_threes)
+  for i := 0; i < b.w; i += 1 {
+    for j := 0; j < b.h; j += 1 {
+      offset_j := 1
+      offset_i := 1
+      for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) {
+        offset_j += 1
+      }
+      if offset_j > 2 {
+        append(&b.rm_i, Triple{i, j, offset_j})
+      }
+      for i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j) {
+        offset_i += 1
+      }
+      if offset_i > 2 {
+        append(&b.rm_j, Triple{i, j, offset_i})
+      }
+    }
+  }
+  for i := 0; i < len(b.rm_i); i += 1 {
+    for j := 0; j < len(b.rm_j); j += 1 {
+      t1 := b.rm_i[i]
+      t2 := b.rm_j[j]
+      i1 := t1.first
+      j1 := t1.second
+      o1 := t1.third
+      i2 := t2.first
+      j2 := t2.second
+      o2 := t2.third
+      if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
+        append(&b.rm_b, Pair{i1, j2})
+      }
+    }
+  }
+  slice.sort_by(b.rm_i[:], proc(a, b: Triple) -> bool {
+    return a.first > b.first
+  })
+  slice.sort_by(b.rm_j[:], proc(a, b: Triple) -> bool {
+    return a.first > b.first
+  })
+  slice.sort_by(b.rm_b[:], proc(a, b: Pair) -> bool {
+    return a.first > b.first
+  })
+}
+has_removals :: proc(b: Board) -> bool {
+  return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b))
+}
 //std::ostream &operator<<(std::ostream &of, const Board &b) {
 //  of << b.score << "\n"
 //     << b.normals << "\n"
@@ -642,6 +682,11 @@ threes :: proc() -> [dynamic]SizedPattern {
 //  return in
 //}
 //
+LeaderboardRecord :: struct {
+  name:  string,
+  score: int,
+}
+Leaderboard :: distinct [dynamic]LeaderboardRecord
 //using Leaderboard = std::vector<std::pair<std::string, int>>
 //
 //Leaderboard ReadLeaderboard() {
@@ -712,17 +757,16 @@ threes :: proc() -> [dynamic]SizedPattern {
 //  }
 //}
 //
-//struct Button {
-//  int x1
-//  int y1
-//  int x2
-//  int y2
-//}
+Button :: struct {
+  x1: f32,
+  y1: f32,
+  x2: f32,
+  y2: f32,
+}
 //
-//bool in_button(Vector2 pos, Button button) {
-//  return pos.x > button.x1 && pos.x < button.x2 && pos.y > button.y1 &&
-//         pos.y < button.y2
-//}
+in_button :: proc(pos: rl.Vector2, button: Button) -> bool {
+  return pos.x > button.x1 && pos.x < button.x2 && pos.y > button.y1 && pos.y < button.y2
+}
 //
 //bool operator==(const Color &a, const Color &b) {
 //  return a.r == b.r && a.g == b.g && a.b == a.b && a.a == b.a
