@@ -5,6 +5,8 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:slice"
+import "core:strings"
+import "core:unicode"
 import rl "vendor:raylib"
 
 Point :: distinct [2]int
@@ -763,105 +765,100 @@ Button :: struct {
   x2: f32,
   y2: f32,
 }
-//
+
 in_button :: proc(pos: rl.Vector2, button: Button) -> bool {
   return pos.x > button.x1 && pos.x < button.x2 && pos.y > button.y1 && pos.y < button.y2
 }
-//
-//bool operator==(const Color &a, const Color &b) {
-//  return a.r == b.r && a.g == b.g && a.b == a.b && a.a == b.a
-//}
-//class ButtonMaker {
-//  bool _play_sound
-//  Sound _sound
-//  float _volume
-//  std::vector<Button> buttons
-//  static bool enter
-//
-//public:
-//  ButtonMaker(bool play_sound, Sound sound, float volume)
-//      : _play_sound{play_sound}, _sound{sound}, _volume{volume} {}
-//  Button draw_button(Vector2 place, std::string text, bool enabled) {
-//    bool button_down = IsMouseButtonDown(MOUSE_BUTTON_LEFT)
-//    auto pos = GetMousePosition()
-//    if (in_button(pos, Button{int(place.x), int(place.y), int(place.x + 200),
-//                              int(place.y + 30)})) {
-//      Color c = enabled ? YELLOW : (button_down ? DARKGRAY : LIGHTGRAY)
-//      if (text == "SOUND") {
-//        int level = int(_volume * 200)
-//        DrawRectangle(place.x, place.y, level, 30, YELLOW)
-//        DrawRectangle(place.x + level, place.y, 200 - level, 30, LIGHTGRAY)
-//        if (button_down) {
-//          int x = GetMouseX()
-//          _volume = (x - place.x) / 200.0
-//        }
-//      } else {
-//        DrawRectangle(place.x, place.y, 200, 30, c)
-//      }
-//    } else {
-//      Color c = enabled ? GOLD : GRAY
-//      if (text == "SOUND") {
-//        int level = int(_volume * 200)
-//        DrawRectangle(place.x, place.y, level, 30, GOLD)
-//        DrawRectangle(place.x + level, place.y, 200 - level, 30, GRAY)
-//      } else {
-//        DrawRectangle(place.x, place.y, 200, 30, c)
-//      }
-//    }
-//    const char *label =
-//        text == "SOUND" ? fmt::format("SOUND ({}%)", int(_volume * 100)).c_str()
-//                        : text.c_str()
-//    auto width = MeasureText(label, 20)
-//    DrawText(label, place.x + 100 - width / 2, place.y + 5, 20, BLACK)
-//    auto button = Button{int(place.x), int(place.y), int(place.x + 200),
-//                         int(place.y + 30)}
-//    buttons.push_back(button)
-//    return button
-//  }
-//  void play_sound() {
-//    if (!_play_sound) {
-//      return
-//    }
-//    bool in = false
-//    for (auto it = buttons.begin(); it != buttons.end(); ++it) {
-//      auto pos = GetMousePosition()
-//      if (in_button(pos, *it)) {
-//        in = true
-//        if (enter) {
-//          enter = false
-//          if (IsSoundReady(_sound)) {
-//            PlaySound(_sound)
-//          }
-//        }
-//      }
-//    }
-//    if (!in) {
-//      enter = true
-//    }
-//  }
-//  float volume() const { return _volume; }
-//}
-//
-//bool ButtonMaker::enter = true
-//
-//class Game {
-//  std::string _name
-//  Board _board
-//  Board _old_board
-//  bool _work_board = false
-//  bool _first_work = true
-//  std::vector<std::tuple<int, int, int>> _removed_cells
-//
-//public:
-//  Game(size_t size) : _board{size, size}, _old_board{_board} {}
-//  int counter = 0
-//  void new_game() {
-//    counter = 0
-//    _work_board = false
-//    _board.fill()
-//    _board.stabilize()
-//    _board.zero()
-//  }
+
+button_maker_enter := true
+
+ButtonMaker :: struct {
+  play_sound: bool,
+  sound:      rl.Sound,
+  volume:     f32,
+  buttons:    [dynamic]Button,
+}
+
+draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool) -> Button {
+  button_down := rl.IsMouseButtonDown(rl.MouseButton.LEFT)
+  pos := rl.GetMousePosition()
+  button := Button{f32(place.x), f32(place.y), f32(place.x + 200), f32(place.y + 30)}
+  if in_button(pos, button) {
+    c := enabled ? rl.YELLOW : (button_down ? rl.DARKGRAY : rl.LIGHTGRAY)
+    if text == "SOUND" {
+      level := bm.volume * 200
+      rl.DrawRectangle(place.x, place.y, i32(level), 30, rl.YELLOW)
+      rl.DrawRectangle(place.x + i32(level), place.y, i32(200 - level), 30, rl.LIGHTGRAY)
+      if button_down {
+        x := rl.GetMouseX()
+        bm.volume = f32((x - place.x) / 200.0)
+      }
+    } else {
+      rl.DrawRectangle(place.x, place.y, 200, 30, c)
+    }
+  } else {
+    c := enabled ? rl.GOLD : rl.GRAY
+    if text == "SOUND" {
+      level := bm.volume * 200
+      rl.DrawRectangle(place.x, place.y, i32(level), 30, rl.GOLD)
+      rl.DrawRectangle(place.x + i32(level), place.y, i32(200 - level), 30, rl.GRAY)
+    } else {
+      rl.DrawRectangle(place.x, place.y, 200, 30, c)
+    }
+  }
+  label := text == "SOUND" ? fmt.ctprintf("SOUND (d%)", bm.volume * 100) : fmt.ctprintf("%s", text)
+  width := rl.MeasureText(label, 20)
+  rl.DrawText(label, place.x + 100 - width / 2, place.y + 5, 20, rl.BLACK)
+  append(&bm.buttons, button)
+  return button
+}
+
+play_sound :: proc(bm: ButtonMaker) {
+  if !bm.play_sound {
+    return
+  }
+  inn := false
+  for it in bm.buttons {
+    pos := rl.GetMousePosition()
+    if in_button(pos, it) {
+      inn = true
+      if button_maker_enter {
+        button_maker_enter = false
+        if (rl.IsSoundReady(bm.sound)) {
+          rl.PlaySound(bm.sound)
+        }
+      }
+    }
+  }
+  if !inn {
+    button_maker_enter = true
+  }
+}
+
+Game :: struct {
+  name:          string,
+  board:         Board,
+  old_board:     Board,
+  work_board:    bool,
+  first_work:    bool,
+  removed_cells: [dynamic]Triple,
+  counter:       int,
+}
+
+make_game :: proc(size: int) -> Game {
+  board := make_board(size, size)
+  return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple)}
+}
+
+new_game :: proc(g: ^Game) {
+  g.counter = 0
+  g.work_board = false
+  fill(&g.board)
+  stabilize(&g.board)
+  zero(&g.board)
+}
+
+
 //  void save() {
 //    std::ofstream save("save.txt")
 //    save << _name << " " << counter << "\n"
@@ -878,272 +875,323 @@ in_button :: proc(pos: rl.Vector2, button: Button) -> bool {
 //    }
 //    return false
 //  }
-//  void save_state() { _old_board = _board; }
-//  bool check_state() const { return _old_board == _board; }
-//  void restore_state() { _board = _old_board; }
-//  void match() {
-//    _board.match_patterns()
-//    _board.match_threes()
-//  }
-//  Board &board() { return _board; }
-//  std::string &name() { return _name; }
-//  void attempt_move(int row1, int col1, int row2, int col2) {
-//    _first_work = true
-//    _work_board = true
-//    save_state()
-//    _board.swap(row1, col1, row2, col2)
-//    _board.prepare_removals()
-//  }
-//  std::vector<std::tuple<int, int, int>> step() {
-//    std::vector<std::tuple<int, int, int>> res
-//    if (!_board.has_removals()) {
-//      _board.prepare_removals()
-//    }
-//    if (!_board.has_removals()) {
-//      if (_first_work) {
-//        restore_state()
-//      } else {
-//        counter += 1
-//      }
-//      _work_board = false
-//      _board.match_patterns()
-//      _board.match_threes()
-//    }
-//    res = _board.remove_one_thing()
-//    _board.fill_up()
-//    _first_work = false
-//    return res
-//  }
-//  bool is_finished() { return counter == 50; }
-//  bool is_processing() { return _work_board; }
-//  std::string game_stats() {
-//    return fmt::format("Moves: {}\nScore: {}\nTrios: {}\nQuartets: "
-//                       "{}\nQuintets: {}\nCrosses: {}",
-//                       counter, _board.score, _board.normals, _board.longers,
-//                       _board.longests, _board.crosses)
-//  }
-//}
-//
-//struct Particle {
-//  float dx = 0
-//  float dy = 0
-//  float da = 0
-//  float x = 0
-//  float y = 0
-//  float a = 0
-//  Color color
-//  int lifetime = 0
-//  int sides = 0
-//}
-//
-//struct Explosion {
-//  int x = 0
-//  int y = 0
-//  int lifetime = 0
-//}
-//
-//void button_flag(Vector2 pos, Button button, bool &flag) {
-//  if (in_button(pos, button)) {
-//    flag = !flag
-//  }
-//}
-//
-//int main() {
-//  auto w = 1280
-//  auto h = 800
-//  auto board_size = 16
-//  Game game(board_size)
-//  bool first_click = true
-//  int saved_row = 0
-//  int saved_col = 0
-//  bool draw_leaderboard = false
-//  bool input_name = false
-//  int frame_counter = 0
-//  bool hints = false
-//  bool particles = false
-//  bool play_sound = false
-//  bool nonacid_colors = false
-//  bool ignore_r = false
-//  size_t l_offset = 0
-//  float volume = 0.0f
-//  int leaderboard_place = -1
-//  Leaderboard leaderboard = ReadLeaderboard()
-//  std::vector<Particle> flying
-//  std::vector<Explosion> staying
-//  std::default_random_engine eng{static_cast<unsigned>(
-//      std::chrono::system_clock::now().time_since_epoch().count())}
-//  std::uniform_int_distribution<int> dd{-10, 10}
-//  InitAudioDevice()
-//  Sound psound = LoadSound("p.ogg")
-//  Sound ksound = LoadSound("k.ogg")
-//  if (!game.load()) {
-//    game.new_game()
-//    input_name = true
-//  }
-//  SetConfigFlags(FLAG_WINDOW_RESIZABLE)
-//  InitWindow(w, h, "Tiar2")
-//  auto icon = LoadImage("icon.png")
-//  SetWindowIcon(icon)
-//  SetTargetFPS(60)
-//  SetTextLineSpacing(23)
-//  while (!WindowShouldClose()) {
-//    SetMasterVolume(volume)
-//    if (frame_counter == 60) {
-//      frame_counter = 0
-//    } else {
-//      frame_counter += 1
-//    }
-//    w = GetRenderWidth()
-//    h = GetRenderHeight()
-//    auto s = 0
-//    if (w > h) {
-//      s = h
-//    } else {
-//      s = w
-//    }
-//    auto margin = 10
-//    auto board_x = w / 2 - s / 2 + margin
-//    auto board_y = h / 2 - s / 2 + margin
-//    auto ss = (s - 2 * margin) / board_size
-//    auto so = 2
-//    auto mo = 0.5
-//    if (game.is_processing() && frame_counter % 6 == 0) {
-//      auto f = game.step()
-//      if (play_sound && !f.empty() && IsSoundReady(psound)) {
-//        PlaySound(psound)
-//      }
-//      if (particles) {
-//        if (play_sound && !f.empty()) {
-//          board_x += dd(eng)
-//          board_y += dd(eng)
-//        }
-//        flying.reserve(flying.size() + f.size())
-//        staying.reserve(staying.size() + f.size())
-//        for (auto it = f.begin(); it != f.end(); ++it) {
-//          Color c
-//          int s
-//          switch (std::get<2>(*it)) {
-//          case 1: {
-//            c = nonacid_colors ? PINK : RED
-//            s = 4
-//            break
-//          }
-//          case 2: {
-//            c = nonacid_colors ? LIME : GREEN
-//            s = 0
-//            break
-//          }
-//          case 3: {
-//            c = nonacid_colors ? SKYBLUE : BLUE
-//            s = 6
-//            break
-//          }
-//          case 4: {
-//            c = nonacid_colors ? GOLD : ORANGE
-//            s = 3
-//            break
-//          }
-//          case 5: {
-//            c = nonacid_colors ? PURPLE : MAGENTA
-//            s = 5
-//            break
-//          }
-//          case 6: {
-//            c = nonacid_colors ? BEIGE : YELLOW
-//            s = 4
-//            break
-//          }
-//          }
-//          flying.emplace_back(dd(eng), dd(eng), dd(eng),
-//                              std::get<1>(*it) * ss + board_x + ss / 2,
-//                              std::get<0>(*it) * ss + board_y + ss / 2, 0, c, 0,
-//                              s)
-//          staying.emplace_back(std::get<1>(*it), std::get<0>(*it), 0)
-//        }
-//      }
-//    }
-//    BeginDrawing()
-//    ClearBackground(RAYWHITE)
-//    DrawRectangle(board_x, board_y, ss * board_size, ss * board_size, BLACK)
-//    for (int i = 0; i < board_size; ++i) {
-//      for (int j = 0; j < board_size; ++j) {
-//        auto pos_x = board_x + i * ss + so
-//        auto pos_y = board_y + j * ss + so
-//        auto radius = (ss - 2 * so) / 2
-//        if (game.board().is_matched(j, i) && hints) {
-//          DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, DARKGRAY)
-//        } else if (game.board().is_three(j, i) && hints) {
-//          DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, LIGHTGRAY)
-//        } else {
-//          DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, GRAY)
-//        }
-//        switch (game.board().at(j, i)) {
-//        case 1:
-//          DrawPoly(Vector2{float(pos_x + radius), float(pos_y + radius)}, 4,
-//                   radius - mo, 45, nonacid_colors ? PINK : RED)
-//          break
-//        case 2:
-//          DrawCircle(pos_x + radius, pos_y + radius, radius - mo,
-//                     nonacid_colors ? LIME : GREEN)
-//          break
-//        case 3:
-//          DrawPoly(Vector2{float(pos_x + radius), float(pos_y + radius)}, 6,
-//                   radius - mo, 0, nonacid_colors ? SKYBLUE : BLUE)
-//          break
-//        case 4:
-//          DrawPoly(
-//              Vector2{float(pos_x + radius), float(pos_y + radius + ss / 12)},
-//              3, radius - mo, -90, nonacid_colors ? GOLD : ORANGE)
-//          break
-//        case 5:
-//          DrawPoly(
-//              Vector2{float(pos_x + radius), float(pos_y + radius + ss / 16)},
-//              5, radius - mo, -90, nonacid_colors ? PURPLE : MAGENTA)
-//          break
-//        case 6:
-//          DrawPoly(Vector2{float(pos_x + radius), float(pos_y + radius)}, 4,
-//                   radius - mo, 0, nonacid_colors ? BEIGE : YELLOW)
-//          break
-//        default:
-//          break
-//        }
-//        if (game.board().is_magic(j, i)) {
-//          DrawCircleGradient(pos_x + radius, pos_y + radius, ss / 6, WHITE,
-//                             BLACK)
-//        }
-//        if (game.board().is_magic2(j, i)) {
-//          DrawCircleGradient(pos_x + radius, pos_y + radius, ss / 6, WHITE,
-//                             DARKPURPLE)
-//        }
-//      }
-//    }
-//    if (!first_click) {
-//      auto pos = GetMousePosition()
-//      pos = Vector2Subtract(pos, Vector2{float(board_x), float(board_y)})
-//      if (!(pos.x < 0 || pos.y < 0 || pos.x > ss * board_size || pos.y > ss * board_size)) {
-//        int row = trunc(pos.y / ss)
-//        int col = trunc(pos.x / ss)
-//        auto dx = col - saved_col
-//        auto dy = row - saved_row
-//        auto radius = (ss - 2 * so) / 2
-//        auto pos_x = board_x + saved_col * ss + so
-//        auto pos_y = board_y + saved_row * ss + so
-//        if (dx == 1 && dy == 0 || dx == 0 && dy == 1) {
-//          if (dx == 1) {
-//            DrawRectangleGradientH(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss : 20, dy == 1 ? ss : 20, BLANK, MAROON)
-//          } else {
-//            DrawRectangleGradientV(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss : 20, dy == 1 ? ss : 20, BLANK, MAROON)
-//          }
-//          DrawPoly(Vector2{float(pos_x + radius + (dx == 1 ? ss : 0)), float(pos_y + radius + (dy == 1 ? ss : 0))}, 3, radius - mo, dx == 1 ? 0 : 90, MAROON)
-//        }
-//        if (dx == -1 && dy == 0 || dx == 0 && dy == -1) {
-//          if (dx == -1) {
-//            DrawRectangleGradientH(pos_x + radius - (dx == -1 ? ss - 10 : 0), pos_y + radius - (dy == -1 ? ss : 10), dx == -1 ? ss : 20, dy == -1 ? ss + 10 : 20, MAROON, BLANK)
-//          } else {
-//            DrawRectangleGradientV(pos_x + radius - (dx == -1 ? ss : 10), pos_y + radius - (dy == -1 ? ss - 10 : 0), dx == -1 ? ss + 10 : 20, dy == -1 ? ss : 20, MAROON, BLANK)
-//          }
-//          DrawPoly(Vector2{float(pos_x + radius - (dx == -1 ? ss : 0)), float(pos_y + radius - (dy == -1 ? ss : 0))}, 3, radius - mo, dx == -1 ? 180 : 270, MAROON)
-//        }
+
+save_state :: proc(g: ^Game) {
+  delete_board(&g.old_board)
+  g.old_board = copy_board(g.board)
+}
+
+check_state :: proc(g: Game) -> bool {
+  return compare_boards(g.old_board, g.board)
+}
+
+restore_state :: proc(g: ^Game) {
+  delete_board(&g.board)
+  g.board = copy_board(g.old_board)
+}
+
+match :: proc(g: ^Game) {
+  match_patterns(&g.board)
+  match_threes(&g.board)
+}
+
+attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
+  g.first_work = true
+  g.work_board = true
+  save_state(g)
+  swap(&g.board, row1, col1, row2, col2)
+  prepare_removals(&g.board)
+}
+
+step_game :: proc(g: ^Game) -> [dynamic]Triple {
+  res := make([dynamic]Triple)
+  if !has_removals(g.board) {
+    prepare_removals(&g.board)
+  }
+  if !has_removals(g.board) {
+    if g.first_work {
+      restore_state(g)
+    } else {
+      g.counter += 1
+    }
+    g.work_board = false
+    match_patterns(&g.board)
+    match_threes(&g.board)
+  }
+  res = remove_one_thing(&g.board)
+  fill_up(&g.board)
+  g.first_work = false
+  return res
+}
+
+is_finished :: proc(g: Game) -> bool {
+  return g.counter == 50
+}
+
+is_processing :: proc(g: Game) -> bool {
+  return g.work_board
+}
+
+game_stats :: proc(g: Game) -> string {
+  return fmt.tprintf(
+    "Moves: %d\nScore: %d\nTrios: %d\nQuartets: %d\nQuintets: %d\nCrosses: %d",
+    g.counter,
+    g.board.score,
+    g.board.normals,
+    g.board.longers,
+    g.board.longests,
+    g.board.crosses,
+  )
+}
+
+Particle :: struct {
+  dx:       f32,
+  dy:       f32,
+  da:       f32,
+  x:        f32,
+  y:        f32,
+  a:        f32,
+  color:    rl.Color,
+  lifetime: int,
+  sides:    int,
+}
+
+Explosion :: struct {
+  x:        int,
+  y:        int,
+  lifetime: int,
+}
+
+button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
+  if in_button(pos, button) {
+    flag^ = !flag^
+  }
+}
+
+main :: proc() {
+  w: i32 = 1280
+  h: i32 = 800
+  board_size := 16
+  game := make_game(board_size)
+  first_click := true
+  saved_row: i32 = 0
+  saved_col: i32 = 0
+  draw_leaderboard := false
+  input_name := false
+  frame_counter := 0
+  hints := false
+  particles := false
+  is_play_sound := false
+  nonacid_colors := false
+  ignore_r := false
+  l_offset := 0
+  volume: f32 = 0.0
+  leaderboard_place := -1
+  leaderboard: Leaderboard
+  flying := make([dynamic]Particle)
+  staying := make([dynamic]Triple)
+  dd := proc() -> int {return rand.int_max(21) - 10}
+  rl.InitAudioDevice()
+  psound := rl.LoadSound("p.ogg")
+  ksound := rl.LoadSound("k.ogg")
+  // TODO: Add game loading here
+  new_game(&game)
+  input_name = true
+  builder := strings.builder_make()
+  rl.SetConfigFlags({rl.ConfigFlag.WINDOW_RESIZABLE})
+  rl.InitWindow(w, h, "Tiar3")
+  icon := rl.LoadImage("icon.png")
+  rl.SetWindowIcon(icon)
+  rl.SetTargetFPS(60)
+  rl.SetTextLineSpacing(23)
+  for !rl.WindowShouldClose() {
+    rl.SetMasterVolume(volume)
+    if frame_counter == 60 {
+      frame_counter = 0
+    } else {
+      frame_counter += 1
+    }
+    w = rl.GetRenderWidth()
+    h = rl.GetRenderHeight()
+    s: i32 = 0
+    if w > h {
+      s = h
+    } else {
+      s = w
+    }
+    margin: i32 = 10
+    board_x := w / 2 - s / 2 + margin
+    board_y := h / 2 - s / 2 + margin
+    ss := (s - 2 * margin) / i32(board_size)
+    so: i32 = 2
+    mo: f32 = 0.5
+    if is_processing(game) && frame_counter % 6 == 0 {
+      f := step_game(&game)
+      if is_play_sound && !(len(f) == 0) && rl.IsSoundReady(psound) {
+        rl.PlaySound(psound)
+      }
+      if particles {
+        if is_play_sound && !(len(f) == 0) {
+          board_x += i32(dd())
+          board_y += i32(dd())
+        }
+        reserve(&flying, len(flying) + len(f))
+        reserve(&staying, len(staying) + len(f))
+        for it in f {
+          c: rl.Color
+          s: int
+          switch it.third {
+          case 1:
+            {
+              c = nonacid_colors ? rl.PINK : rl.RED
+              s = 4
+            }
+          case 2:
+            {
+              c = nonacid_colors ? rl.LIME : rl.GREEN
+              s = 0
+            }
+          case 3:
+            {
+              c = nonacid_colors ? rl.SKYBLUE : rl.BLUE
+              s = 6
+            }
+          case 4:
+            {
+              c = nonacid_colors ? rl.GOLD : rl.ORANGE
+              s = 3
+            }
+          case 5:
+            {
+              c = nonacid_colors ? rl.PURPLE : rl.MAGENTA
+              s = 5
+            }
+          case 6:
+            {
+              c = nonacid_colors ? rl.BEIGE : rl.YELLOW
+              s = 4
+            }
+          }
+          append(
+            &flying,
+            Particle{f32(dd()), f32(dd()), f32(dd()), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s},
+          )
+          append(&staying, Triple{it.second, it.first, 0})
+        }
+      }
+    }
+    rl.BeginDrawing()
+    rl.ClearBackground(rl.RAYWHITE)
+    rl.DrawRectangle(board_x, board_y, ss * i32(board_size), ss * i32(board_size), rl.BLACK)
+    for i := 0; i < board_size; i += 1 {
+      for j := 0; j < board_size; j += 1 {
+        pos_x := board_x + i32(i) * ss + so
+        pos_y := board_y + i32(j) * ss + so
+        radius := (ss - 2 * so) / 2
+        if is_matched(game.board, j, i) && hints {
+          rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.DARKGRAY)
+        } else if is_three(game.board, j, i) && hints {
+          rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.LIGHTGRAY)
+        } else {
+          rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.GRAY)
+        }
+        switch at(game.board, j, i) {
+        case 1:
+          {
+            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
+          }
+        case 2:
+          {
+            rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
+          }
+        case 3:
+          {
+            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
+          }
+        case 4:
+          {
+            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 3, f32(radius) - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
+          }
+        case 5:
+          {
+            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
+          }
+        case 6:
+          {
+            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.BEIGE : rl.YELLOW)
+          }
+        }
+        if is_magic(game.board, j, i) {
+          rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
+        }
+        if is_magic2(game.board, j, i) {
+          rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
+        }
+      }
+    }
+    if !first_click {
+      pos := rl.GetMousePosition()
+      pos -= {f32(board_x), f32(board_y)}
+      if !(pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size))) {
+        row := i32(pos.y / f32(ss))
+        col := i32(pos.x / f32(ss))
+        dx := col - saved_col
+        dy := row - saved_row
+        radius := (ss - 2 * so) / 2
+        pos_x := board_x + saved_col * ss + so
+        pos_y := board_y + saved_row * ss + so
+        if dx == 1 && dy == 0 || dx == 0 && dy == 1 {
+          if dx == 1 {
+            rl.DrawRectangleGradientH(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss : 20, dy == 1 ? ss : 20, rl.BLANK, rl.MAROON)
+          } else {
+            rl.DrawRectangleGradientV(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss : 20, dy == 1 ? ss : 20, rl.BLANK, rl.MAROON)
+          }
+          rl.DrawPoly({f32(pos_x + radius + (dx == 1 ? ss : 0)), f32(pos_y + radius + (dy == 1 ? ss : 0))}, 3, f32(radius) - mo, dx == 1 ? 0 : 90, rl.MAROON)
+        }
+        if dx == -1 && dy == 0 || dx == 0 && dy == -1 {
+          if (dx == -1) {
+            rl.DrawRectangleGradientH(
+              pos_x + radius - (dx == -1 ? ss - 10 : 0),
+              pos_y + radius - (dy == -1 ? ss : 10),
+              dx == -1 ? ss : 20,
+              dy == -1 ? ss + 10 : 20,
+              rl.MAROON,
+              rl.BLANK,
+            )
+          } else {
+            rl.DrawRectangleGradientV(
+              pos_x + radius - (dx == -1 ? ss : 10),
+              pos_y + radius - (dy == -1 ? ss - 10 : 0),
+              dx == -1 ? ss + 10 : 20,
+              dy == -1 ? ss : 20,
+              rl.MAROON,
+              rl.BLANK,
+            )
+          }
+          rl.DrawPoly(
+            {f32(pos_x + radius - (dx == -1 ? ss : 0)), f32(pos_y + radius - (dy == -1 ? ss : 0))},
+            3,
+            f32(radius) - mo,
+            dx == -1 ? 180 : 270,
+            rl.MAROON,
+          )
+        }
+      }
+    }
+    if input_name {
+      c := rl.GetCharPressed()
+      if unicode.is_alpha(c) || c == '_' && len(game.name) < 22 && !ignore_r {
+        strings.write_rune(&builder, c)
+      }
+      ignore_r = false
+      rl.DrawRectangle(w / 4, h / 2 - h / 16, w / 2, h / 8, rl.WHITE)
+      rl.DrawText("Enter your name:", w / 4, h / 2 - h / 16, 50, rl.BLACK)
+      rl.DrawText(fmt.ctprintf("%s", strings.to_string(builder)), w / 4, h / 2 - h / 16 + 50, 50, rl.BLACK)
+    }
+  }
+}
+
+
 //      }
 //    }
 //    if (input_name) {
