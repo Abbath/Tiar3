@@ -4,6 +4,7 @@ package main
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
+import "core:mem"
 import "core:slice"
 import "core:strings"
 import "core:unicode"
@@ -26,7 +27,7 @@ shift :: proc(p: Pattern) -> Pattern {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
   }
-  res: Pattern
+  res := make(Pattern, len(p))
   copy(res[:], p[:])
   for &pt in res {
     pt -= {minX, minY}
@@ -171,6 +172,9 @@ make_board :: proc(w, h: int) -> Board {
   b.matched_threes = make(map[Pair]struct {})
   b.magic_tiles = make(map[Pair]struct {})
   b.magic_tiles2 = make(map[Pair]struct {})
+  b.rm_i = make([dynamic]Triple)
+  b.rm_j = make([dynamic]Triple)
+  b.rm_b = make([dynamic]Pair)
   return b
 }
 delete_board :: proc(b: ^Board) {
@@ -179,6 +183,9 @@ delete_board :: proc(b: ^Board) {
   delete(b.matched_threes)
   delete(b.magic_tiles)
   delete(b.magic_tiles2)
+  delete(b.rm_i)
+  delete(b.rm_j)
+  delete(b.rm_b)
 }
 copy_set :: proc(m: map[Pair]struct {}) -> map[Pair]struct {} {
   m1 := make(map[Pair]struct {}, len(m))
@@ -266,7 +273,9 @@ reasonable_coord :: proc(b: Board, i, j: int) -> bool {
 }
 remove_trios :: proc(b: ^Board) {
   remove_i := make([dynamic]Triple)
+  defer delete(remove_i)
   remove_j := make([dynamic]Triple)
+  defer delete(remove_j)
   for i := 0; i < b.w; i += 1 {
     for j := 0; j < b.h; j += 1 {
       offset_i := 1
@@ -780,6 +789,10 @@ ButtonMaker :: struct {
   buttons:    [dynamic]Button,
 }
 
+delete_button_maker :: proc(bm: ^ButtonMaker) {
+  delete(bm.buttons)
+}
+
 draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool) -> Button {
   button_down := rl.IsMouseButtonDown(rl.MouseButton.LEFT)
   pos := rl.GetMousePosition()
@@ -807,7 +820,7 @@ draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool
       rl.DrawRectangle(place.x, place.y, 200, 30, c)
     }
   }
-  label := text == "SOUND" ? fmt.ctprintf("SOUND (d%)", bm.volume * 100) : fmt.ctprintf("%s", text)
+  label := text == "SOUND" ? fmt.ctprintf("SOUND (%d)", int(bm.volume * 100)) : fmt.ctprintf("%s", text)
   width := rl.MeasureText(label, 20)
   rl.DrawText(label, place.x + 100 - width / 2, place.y + 5, 20, rl.BLACK)
   append(&bm.buttons, button)
@@ -848,7 +861,12 @@ Game :: struct {
 
 make_game :: proc(size: int) -> Game {
   board := make_board(size, size)
-  return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple)}
+  return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple), name = ""}
+}
+
+delete_game :: proc(g: ^Game) {
+  delete_board(&g.board)
+  delete_board(&g.old_board)
 }
 
 new_game :: proc(g: ^Game) {
@@ -970,10 +988,26 @@ button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
 }
 
 main :: proc() {
+  when ODIN_DEBUG {
+    track: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&track, context.allocator)
+    context.allocator = mem.tracking_allocator(&track)
+
+    defer {
+      if len(track.allocation_map) > 0 {
+        fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
+        for _, entry in track.allocation_map {
+          fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+        }
+      }
+      mem.tracking_allocator_destroy(&track)
+    }
+  }
   w: i32 = 1280
   h: i32 = 800
   board_size := 16
   game := make_game(board_size)
+  defer delete_game(&game)
   first_click := true
   saved_row: i32 = 0
   saved_col: i32 = 0
@@ -1028,6 +1062,7 @@ main :: proc() {
     mo: f32 = 0.5
     if is_processing(game) && frame_counter % 6 == 0 {
       f := step_game(&game)
+      defer delete(f)
       if is_play_sound && !(len(f) == 0) && rl.IsSoundReady(psound) {
         rl.PlaySound(psound)
       }
@@ -1209,29 +1244,30 @@ main :: proc() {
       }
       //      DrawLeaderboard(leaderboard, l_offset, leaderboard_place)
     }
-    rl.DrawText(fmt.caprintf("%s", game_stats(game)), 3, 0, 30, rl.BLACK)
+    rl.DrawText(fmt.ctprintf("%s", game_stats(game)), 3, 0, 30, rl.BLACK)
     rl.DrawText(fmt.ctprintf("Player:\n%s", game.name), 3, h - 55, 20, rl.BLACK)
     bm := ButtonMaker {
       play_sound = is_play_sound,
       sound      = ksound,
       volume     = volume,
     }
+    defer delete_button_maker(&bm)
     start_y: i32 = 40
     sound_button := draw_button(&bm, {w - 210, h - start_y}, "SOUND", true)
     start_y += 40
-    particles_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "PARTICLES", particles)
+    particles_button := draw_button(&bm, {w - 210, h - start_y}, "PARTICLES", particles)
     start_y += 40
-    hints_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "HINTS", hints)
+    hints_button := draw_button(&bm, {w - 210, h - start_y}, "HINTS", hints)
     start_y += 40
-    acid_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "NO ACID", nonacid_colors)
+    acid_button := draw_button(&bm, {w - 210, h - start_y}, "NO ACID", nonacid_colors)
     start_y += 40
-    lbutton := draw_button(&bm, {(w - 210), (h - (start_y))}, "LEADERBOARD", draw_leaderboard)
+    lbutton := draw_button(&bm, {w - 210, h - start_y}, "LEADERBOARD", draw_leaderboard)
     start_y += 40
-    rbutton := draw_button(&bm, {(w - 210), (h - (start_y))}, "RESTART", false)
+    rbutton := draw_button(&bm, {w - 210, h - start_y}, "RESTART", false)
     start_y += 40
-    load_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "LOAD", false)
+    load_button := draw_button(&bm, {w - 210, h - start_y}, "LOAD", false)
     start_y += 40
-    save_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "SAVE", false)
+    save_button := draw_button(&bm, {w - 210, h - start_y}, "SAVE", false)
     play_sound(bm)
     volume = bm.volume
     if volume < 0.05 {
@@ -1352,6 +1388,7 @@ main :: proc() {
             new_game(&game)
             ignore_r = true
             input_name = true
+            strings.builder_reset(&builder)
           }
         case .L:
           {
@@ -1406,10 +1443,12 @@ main :: proc() {
       new_game(&game)
       draw_leaderboard = true
     }
+    free_all(context.temp_allocator)
   }
 
   // TODO: save game
   // TODO: write leaderboard
+  strings.builder_destroy(&builder)
   rl.CloseWindow()
   rl.CloseAudioDevice()
 }
