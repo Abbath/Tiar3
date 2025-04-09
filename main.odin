@@ -60,7 +60,8 @@ mirrored :: proc(p: Pattern) -> Pattern {
 
 sized :: proc(p: Pattern) -> SizedPattern {
   res: SizedPattern
-  res.pat = p
+  res.pat = make(Pattern, len(p))
+  copy(res.pat[:], p[:])
   maxX := min(int)
   maxY := min(int)
   for &pt in p {
@@ -78,13 +79,13 @@ generate :: proc(p: Pattern, symmetric: bool = false) -> [dynamic]SizedPattern {
   if !symmetric {
     m := mirrored(p)
     r := rotations(m)
-    reserve(&res1, len(s) + len(r))
+    resize(&res1, len(s) + len(r))
     copy(res1[:], r[:])
   } else {
-    reserve(&res1, len(s))
+    resize(&res1, len(s))
   }
   copy(res1[:], s[:])
-  res2: [dynamic]SizedPattern
+  res2 := make([dynamic]SizedPattern)
   reserve(&res2, len(res1))
   for pt in res1 {
     append(&res2, sized(pt))
@@ -212,7 +213,7 @@ set_at :: proc(brd: ^Board, a, b, v: int) {
 match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
   for i := 1; i < len(p.pat); i += 1 {
-    if color == at(b, x + p.pat[i].x, y + p.pat[i].y) {
+    if color != at(b, x + p.pat[i].x, y + p.pat[i].y) {
       return false
     }
   }
@@ -503,12 +504,13 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
     }
     if offset == 5 {
       r := make(map[Pair]struct {})
+      defer delete(r)
       for i := 0; i < b.w; i += 1 {
         x, y: int
         for {
           x = uniform_dist_2(b^)
           y = uniform_dist_3(b^)
-          if ({x, y} in r) {
+          if !({x, y} in r) {
             break
           }
         }
@@ -550,12 +552,13 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
     }
     if offset == 5 {
       r := make(map[Pair]struct {})
+      defer delete(r)
       for i := 0; i < b.w; i += 1 {
         x, y: int
         for {
           x = uniform_dist_2(b^)
           y = uniform_dist_3(b^)
-          if ({x, y} in r) {
+          if !({x, y} in r) {
             break
           }
         }
@@ -805,7 +808,7 @@ draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool
       rl.DrawRectangle(place.x + i32(level), place.y, i32(200 - level), 30, rl.LIGHTGRAY)
       if button_down {
         x := rl.GetMouseX()
-        bm.volume = f32((x - place.x) / 200.0)
+        bm.volume = f32(x - place.x) / 200.0
       }
     } else {
       rl.DrawRectangle(place.x, place.y, 200, 30, c)
@@ -923,7 +926,7 @@ attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
 }
 
 step_game :: proc(g: ^Game) -> [dynamic]Triple {
-  res := make([dynamic]Triple)
+  res: [dynamic]Triple
   if !has_removals(g.board) {
     prepare_removals(&g.board)
   }
@@ -934,8 +937,7 @@ step_game :: proc(g: ^Game) -> [dynamic]Triple {
       g.counter += 1
     }
     g.work_board = false
-    match_patterns(&g.board)
-    match_threes(&g.board)
+    match(g)
   }
   res = remove_one_thing(&g.board)
   fill_up(&g.board)
@@ -1324,6 +1326,10 @@ main :: proc() {
           button_flag(pos, hints_button, &hints)
           button_flag(pos, acid_button, &nonacid_colors)
           button_flag(pos, lbutton, &draw_leaderboard)
+          if in_button(pos, rbutton) {
+            new_game(&game)
+            input_name = true
+          }
           if in_button(pos, load_button) {
             // TODO: load game
           }
