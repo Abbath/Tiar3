@@ -36,7 +36,8 @@ shift :: proc(p: Pattern) -> Pattern {
 
 rotations :: proc(p: Pattern) -> [4]Pattern {
   res: [4]Pattern
-  res[0] = p
+  res[0] = make(Pattern, len(p))
+  copy(res[0][:], p[:])
   for i := 1; i < 4; i += 1 {
     rotated := make(Pattern, len(p))
     for j := 0; j < len(p); j += 1 {
@@ -49,7 +50,7 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
 }
 
 mirrored :: proc(p: Pattern) -> Pattern {
-  m: Pattern
+  m := make(Pattern, len(p))
   for i := 0; i < len(p); i += 1 {
     m[i].y = -p[i].y
   }
@@ -989,7 +990,7 @@ main :: proc() {
   leaderboard_place := -1
   leaderboard: Leaderboard
   flying := make([dynamic]Particle)
-  staying := make([dynamic]Triple)
+  staying := make([dynamic]Explosion)
   dd := proc() -> int {return rand.int_max(21) - 10}
   rl.InitAudioDevice()
   psound := rl.LoadSound("p.ogg")
@@ -1076,7 +1077,7 @@ main :: proc() {
             &flying,
             Particle{f32(dd()), f32(dd()), f32(dd()), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s},
           )
-          append(&staying, Triple{it.second, it.first, 0})
+          append(&staying, Explosion{it.second, it.first, 0})
         }
       }
     }
@@ -1188,241 +1189,227 @@ main :: proc() {
       rl.DrawText("Enter your name:", w / 4, h / 2 - h / 16, 50, rl.BLACK)
       rl.DrawText(fmt.ctprintf("%s", strings.to_string(builder)), w / 4, h / 2 - h / 16 + 50, 50, rl.BLACK)
     }
+    if draw_leaderboard && !input_name {
+      wheel_move := rl.GetMouseWheelMove()
+      kd := rl.IsKeyPressed(rl.KeyboardKey.DOWN)
+      ku := rl.IsKeyPressed(rl.KeyboardKey.UP)
+      if wheel_move == 0 {
+        if kd {
+          wheel_move = -1
+        }
+        if ku {
+          wheel_move = 1
+        }
+      }
+      if wheel_move != 0 {
+        if l_offset != 0 || wheel_move <= 0 {
+          l_offset = l_offset - (wheel_move < 0 ? -1 : 1)
+        }
+        l_offset = min(l_offset, len(leaderboard) - 1)
+      }
+      //      DrawLeaderboard(leaderboard, l_offset, leaderboard_place)
+    }
+    rl.DrawText(fmt.caprintf("%s", game_stats(game)), 3, 0, 30, rl.BLACK)
+    rl.DrawText(fmt.ctprintf("Player:\n%s", game.name), 3, h - 55, 20, rl.BLACK)
+    bm := ButtonMaker {
+      play_sound = is_play_sound,
+      sound      = ksound,
+      volume     = volume,
+    }
+    start_y: i32 = 40
+    sound_button := draw_button(&bm, {w - 210, h - start_y}, "SOUND", true)
+    start_y += 40
+    particles_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "PARTICLES", particles)
+    start_y += 40
+    hints_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "HINTS", hints)
+    start_y += 40
+    acid_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "NO ACID", nonacid_colors)
+    start_y += 40
+    lbutton := draw_button(&bm, {(w - 210), (h - (start_y))}, "LEADERBOARD", draw_leaderboard)
+    start_y += 40
+    rbutton := draw_button(&bm, {(w - 210), (h - (start_y))}, "RESTART", false)
+    start_y += 40
+    load_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "LOAD", false)
+    start_y += 40
+    save_button := draw_button(&bm, {(w - 210), (h - (start_y))}, "SAVE", false)
+    play_sound(bm)
+    volume = bm.volume
+    if volume < 0.05 {
+      volume = 0
+    }
+    is_play_sound = volume != 0
+    if particles {
+      new_staying := make([dynamic]Explosion)
+      reserve(&new_staying, len(staying))
+      for it in staying {
+        p := it
+        rl.DrawRectangle(board_x + i32(p.x) * ss + so, board_y + i32(p.y) * ss + so, ss - 2 * so, ss - 2 * so, rl.WHITE)
+        if p.lifetime > 6 {
+          continue
+        }
+        p.lifetime += 1
+        append(&new_staying, p)
+      }
+      delete(staying)
+      shrink(&new_staying)
+      staying = new_staying
+
+      new_flying := make([dynamic]Particle)
+      reserve(&new_flying, len(flying))
+      for it in flying {
+        p := it
+        c := p.color
+        c.a = u8(255 - p.lifetime)
+        if p.sides == 0 {
+          rl.DrawCircle(i32(p.x), i32(p.y), f32(ss / 2), c)
+        } else {
+          rl.DrawPoly({f32(p.x), f32(p.y)}, i32(p.sides), f32(ss / 2), p.a, c)
+        }
+        p.y += p.dy
+        if p.y > f32(h) || p.x < 0 || p.x > f32(w) || p.lifetime > 254 {
+          continue
+        }
+        p.x += p.dx
+        p.a += p.da
+        p.dy += 1
+        p.lifetime += 1
+        append(&new_flying, p)
+      }
+      shrink(&new_flying)
+      delete(flying)
+      flying = new_flying
+    }
+    rl.EndDrawing()
+    outside: {
+      if !input_name && !is_processing(game) {
+        if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+          pos := rl.GetMousePosition()
+          button_flag(pos, particles_button, &particles)
+          button_flag(pos, hints_button, &hints)
+          button_flag(pos, acid_button, &nonacid_colors)
+          button_flag(pos, lbutton, &draw_leaderboard)
+          if in_button(pos, load_button) {
+            // TODO: load game
+          }
+          if in_button(pos, save_button) {
+            // TODO: save game
+          }
+          if draw_leaderboard {
+            break outside
+          }
+          pos = pos - {f32(board_x), f32(board_y)}
+          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) {
+            break outside
+          }
+          row := i32(pos.y / f32(ss))
+          col := i32(pos.x / f32(ss))
+          if first_click {
+            saved_row = row
+            saved_col = col
+            first_click = false
+          } else {
+            first_click = true
+            if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) {
+              attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
+            }
+          }
+        } else if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
+          pos := rl.GetMousePosition()
+          pos = pos - {f32(board_x), f32(board_y)}
+          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) {
+            break outside
+          }
+          row := i32(pos.y / f32(ss))
+          col := i32(pos.x / f32(ss))
+          if row != saved_row || col != saved_col {
+            if !first_click {
+              first_click = true
+              if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) {
+                attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
+              }
+            }
+          }
+        }
+      }
+    }
+    if rl.IsKeyPressed(.ENTER) && input_name {
+      input_name = false
+      game.name = strings.to_string(builder)
+      if len(game.name) == 0 {
+        game.name = "dupa"
+      }
+    } else if rl.IsKeyPressed(.BACKSPACE) {
+      strings.pop_rune(&builder)
+    } else if !input_name {
+      for {
+        key := rl.GetKeyPressed()
+        if key == .KEY_NULL {
+          break
+        }
+        #partial switch key {
+        case .R:
+          {
+            new_game(&game)
+            ignore_r = true
+            input_name = true
+          }
+        case .L:
+          {
+            draw_leaderboard = !draw_leaderboard
+            if !draw_leaderboard {
+              leaderboard_place = -1
+            }
+          }
+        case .P:
+          {
+            particles = !particles
+          }
+        case .M:
+          {
+            is_play_sound = !is_play_sound
+          }
+        case .H:
+          {
+            hints = !hints
+          }
+        case .A:
+          {
+            nonacid_colors = !nonacid_colors
+          }
+        case .S:
+          {
+            // TODO: save game
+          }
+        case .O:
+          {
+            // TODO: load game
+          }
+        }
+      }
+    }
+
+    if is_finished(game) {
+      for lr, idx in leaderboard {
+        if lr.score < game.board.score {
+          assign_at(&leaderboard, idx, LeaderboardRecord{game.name, game.board.score})
+          leaderboard_place = idx
+          l_offset = max(0, idx - 4)
+          break
+        }
+      }
+      if leaderboard_place == -1 {
+        leaderboard_place = len(leaderboard)
+        append(&leaderboard, LeaderboardRecord{game.name, game.board.score})
+        l_offset = max(0, leaderboard_place - 4)
+      }
+      // TODO: write leaderboard
+      new_game(&game)
+      draw_leaderboard = true
+    }
   }
+
+  // TODO: save game
+  // TODO: write leaderboard
+  rl.CloseWindow()
+  rl.CloseAudioDevice()
 }
-
-
-//      }
-//    }
-//    if (input_name) {
-//      char c = GetCharPressed()
-//      if ((std::isalnum(c) || c == '_') && game.name().length() < 22 &&
-//          !ignore_r) {
-//        game.name() += c
-//      }
-//      ignore_r = false
-//      DrawRectangle(w / 4, h / 2 - h / 16, w / 2, h / 8, WHITE)
-//      DrawText("Enter your name:", w / 4, h / 2 - h / 16, 50, BLACK)
-//      DrawText(game.name().c_str(), w / 4, h / 2 - h / 16 + 50, 50, BLACK)
-//    }
-//    if (draw_leaderboard && !input_name) {
-//      auto wheel_move = GetMouseWheelMove()
-//      auto kd = IsKeyPressed(KEY_DOWN)
-//      auto ku = IsKeyPressed(KEY_UP)
-//      if (wheel_move == 0) {
-//        if (kd) {
-//          wheel_move = -1
-//        }
-//        if (ku) {
-//          wheel_move = 1
-//        }
-//      }
-//      if (wheel_move != 0) {
-//        if (l_offset != 0 || wheel_move <= 0) {
-//          l_offset = l_offset - size_t(std::signbit(wheel_move) ? -1 : 1)
-//        }
-//        l_offset = std::min(l_offset, leaderboard.size() - 1)
-//      }
-//      DrawLeaderboard(leaderboard, l_offset, leaderboard_place)
-//    }
-//    DrawText(game.game_stats().c_str(), 3, 0, 30, BLACK)
-//    DrawText((fmt::format("Player:\n") + game.name()).c_str(), 3, h - 55, 20,
-//             BLACK)
-//    ButtonMaker bm(play_sound, ksound, volume)
-//    auto start_y = 0
-//    auto sound_button = bm.draw_button(
-//        {float(w - 210), float(h - (start_y += 40))}, "SOUND", true)
-//    auto particles_button = bm.draw_button(
-//        {float(w - 210), float(h - (start_y += 40))}, "PARTICLES", particles)
-//    auto hints_button = bm.draw_button(
-//        {float(w - 210), float(h - (start_y += 40))}, "HINTS", hints)
-//    auto acid_button =
-//        bm.draw_button({float(w - 210), float(h - (start_y += 40))}, "NO ACID",
-//                       nonacid_colors)
-//    auto lbutton = bm.draw_button({float(w - 210), float(h - (start_y += 40))},
-//                                  "LEADERBOARD", draw_leaderboard)
-//    auto rbutton = bm.draw_button({float(w - 210), float(h - (start_y += 40))},
-//                                  "RESTART", false)
-//    auto load_button = bm.draw_button(
-//        {float(w - 210), float(h - (start_y += 40))}, "LOAD", false)
-//    auto save_button = bm.draw_button(
-//        {float(w - 210), float(h - (start_y += 40))}, "SAVE", false)
-//    bm.play_sound()
-//    volume = bm.volume()
-//    if (volume < 0.05f) {
-//      volume = 0.0f
-//    }
-//    play_sound = volume != 0.0f
-//    if (particles) {
-//      std::vector<Explosion> new_staying
-//      new_staying.reserve(staying.size())
-//      for (auto it = staying.begin(); it != staying.end(); ++it) {
-//        Explosion p = *it
-//        DrawRectangle(board_x + p.x * ss + so, board_y + p.y * ss + so,
-//                      ss - 2 * so, ss - 2 * so, WHITE)
-//        if (p.lifetime > 6) {
-//          continue
-//        }
-//        p.lifetime += 1
-//        new_staying.push_back(p)
-//      }
-//      new_staying.shrink_to_fit()
-//      staying = new_staying
-//
-//      std::vector<Particle> new_flying
-//      new_flying.reserve(flying.size())
-//      for (auto it = flying.begin(); it != flying.end(); ++it) {
-//        Particle p = *it
-//        auto c = p.color
-//        c.a = 255 - p.lifetime
-//        if (p.sides == 0) {
-//          DrawCircle(p.x, p.y, ss / 2, c)
-//        } else {
-//          DrawPoly(Vector2{float(p.x), float(p.y)}, p.sides, ss / 2, p.a, c)
-//        }
-//        p.y += p.dy
-//        if (p.y > h || p.x < 0 || p.x > w || p.lifetime > 254) {
-//          continue
-//        }
-//        p.x += p.dx
-//        p.a += p.da
-//        p.dy += 1
-//        p.lifetime += 1
-//        new_flying.push_back(p)
-//      }
-//      new_flying.shrink_to_fit()
-//      flying = new_flying
-//    }
-//    EndDrawing()
-//    if (!input_name && !game.is_processing()) {
-//      if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-//        auto pos = GetMousePosition()
-//        button_flag(pos, particles_button, particles)
-//        button_flag(pos, hints_button, hints)
-//        button_flag(pos, acid_button, nonacid_colors)
-//        button_flag(pos, lbutton, draw_leaderboard)
-//        if (in_button(pos, rbutton)) {
-//          game.new_game()
-//          input_name = true
-//        }
-//        if (in_button(pos, load_button)) {
-//          game.load()
-//        }
-//        if (in_button(pos, save_button)) {
-//          game.save()
-//        }
-//        if (draw_leaderboard) {
-//          goto outside
-//        }
-//        pos = Vector2Subtract(pos, Vector2{float(board_x), float(board_y)})
-//        if (pos.x < 0 || pos.y < 0 || pos.x > ss * board_size ||
-//            pos.y > ss * board_size) {
-//          goto outside
-//        }
-//        auto row = trunc(pos.y / ss)
-//        auto col = trunc(pos.x / ss)
-//        if (first_click) {
-//          saved_row = row
-//          saved_col = col
-//          first_click = false
-//        } else {
-//          first_click = true
-//          if (((abs(row - saved_row) == 1) ^ (abs(col - saved_col) == 1))) {
-//            game.attempt_move(row, col, saved_row, saved_col)
-//          }
-//        }
-//      } else if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-//        auto pos = GetMousePosition()
-//        pos = Vector2Subtract(pos, Vector2{float(board_x), float(board_y)})
-//        if (pos.x < 0 || pos.y < 0 || pos.x > ss * board_size ||
-//            pos.y > ss * board_size) {
-//          goto outside
-//        }
-//        auto row = trunc(pos.y / ss)
-//        auto col = trunc(pos.x / ss)
-//        if (row != saved_row || col != saved_col) {
-//          if (!first_click) {
-//            first_click = true
-//            if (((abs(row - saved_row) == 1) ^ (abs(col - saved_col) == 1))) {
-//              game.attempt_move(row, col, saved_row, saved_col)
-//            }
-//          }
-//        }
-//      }
-//    }
-//  outside:
-//    if (IsKeyPressed(KEY_ENTER) && input_name) {
-//      input_name = false
-//      if (game.name().empty()) {
-//        game.name() = "dupa"
-//      }
-//    } else if (IsKeyPressed(KEY_BACKSPACE) && input_name) {
-//      if (!game.name().empty()) {
-//        game.name().pop_back()
-//      }
-//    } else if (!input_name) {
-//      while (int key = GetKeyPressed()) {
-//        switch (KeyboardKey(key)) {
-//        case KEY_R: {
-//          game.new_game()
-//          ignore_r = true
-//          input_name = true
-//          break
-//        }
-//        case KEY_L: {
-//          draw_leaderboard = !draw_leaderboard
-//          if (draw_leaderboard == false) {
-//            leaderboard_place = -1
-//          }
-//          break
-//        }
-//        case KEY_P: {
-//          particles = !particles
-//          break
-//        }
-//        case KEY_M: {
-//          play_sound = !play_sound
-//          break
-//        }
-//        case KEY_H: {
-//          hints = !hints
-//          break
-//        }
-//        case KEY_A: {
-//          nonacid_colors = !nonacid_colors
-//          break
-//        }
-//        case KEY_S: {
-//          game.save()
-//          break
-//        }
-//        case KEY_O: {
-//          game.load()
-//          break
-//        }
-//        default:
-//          break
-//        }
-//      }
-//    }
-//    if (game.is_finished()) {
-//      for (auto i = 0; i <= leaderboard.size(); ++i) {
-//        if (i == leaderboard.size() || leaderboard[i].second < game.board().score) {
-//          leaderboard.insert(leaderboard.begin() + i,
-//                             {game.name(), game.board().score})
-//          leaderboard_place = i
-//          l_offset = std::max(0, i - 4)
-//          break
-//        }
-//      }
-//      WriteLeaderboard(leaderboard)
-//      game.new_game()
-//      draw_leaderboard = true
-//    }
-//  }
-//  game.save()
-//  WriteLeaderboard(leaderboard)
-//  CloseWindow()
-//  CloseAudioDevice()
-//  return 0
-//}
