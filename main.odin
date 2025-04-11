@@ -1,7 +1,9 @@
 #+feature dynamic-literals
 package main
 
+import "core:bufio"
 import "core:fmt"
+import "core:io"
 import "core:math"
 import "core:math/rand"
 import "core:mem"
@@ -634,57 +636,6 @@ prepare_removals :: proc(b: ^Board) {
 has_removals :: proc(b: Board) -> bool {
   return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b))
 }
-//std::ostream &operator<<(std::ostream &of, const Board &b) {
-//  of << b.score << "\n"
-//     << b.normals << "\n"
-//     << b.longers << "\n"
-//     << b.longests << "\n"
-//     << b.crosses << "\n"
-//     << b.w << " " << b.h << "\n"
-//  for (int i = 0; i < b.w; ++i) {
-//    for (int j = 0; j < b.h; ++j) {
-//      of << b.at(i, j) << " "
-//    }
-//    of << std::endl
-//  }
-//  of << b.magic_tiles.size() << "\n"
-//  for (auto it = b.magic_tiles.begin(); it != b.magic_tiles.end(); ++it) {
-//    of << it->first << " " << it->second << " "
-//  }
-//  of << "\n"
-//  of << b.magic_tiles2.size() << "\n"
-//  for (auto it = b.magic_tiles2.begin(); it != b.magic_tiles2.end(); ++it) {
-//    of << it->first << " " << it->second << " "
-//  }
-//  of << "\n"
-//  return of
-//}
-//
-//std::istream &operator>>(std::istream &in, Board &b) {
-//  in >> b.score >> b.normals >> b.longers >> b.longests >> b.crosses >> b.w >>
-//      b.h
-//  b.board.resize(b.w * b.h)
-//  for (int i = 0; i < b.w; ++i) {
-//    for (int j = 0; j < b.h; ++j) {
-//      in >> b.at(i, j)
-//    }
-//  }
-//  int s
-//  in >> s
-//  b.magic_tiles.clear()
-//  int i, j
-//  for (int k = 0; k < s; ++k) {
-//    in >> i >> j
-//    b.magic_tiles.insert({i, j})
-//  }
-//  in >> s
-//  for (int k = 0; k < s; ++k) {
-//    in >> i >> j
-//    b.magic_tiles2.insert({i, j})
-//  }
-//  return in
-//}
-//
 LeaderboardRecord :: struct {
   name:  string,
   score: int,
@@ -866,22 +817,162 @@ new_game :: proc(g: ^Game) {
   stabilize(&g.board, g.patterns, g.threes)
   zero(&g.board)
 }
-//  void save() {
-//    std::ofstream save("save.txt")
-//    save << _name << " " << counter << "\n"
-//    save << _board
-//  }
-//  bool load() {
-//    std::ifstream load("save.txt")
-//    if (load) {
-//      _work_board = false
-//      load >> _name >> counter >> _board
-//      _board.match_patterns()
-//      _board.match_threes()
-//      return true
+save :: proc(g: Game) {
+  builder := strings.builder_make()
+  defer strings.builder_destroy(&builder)
+  str := fmt.aprintf("%s %d\n", g.name, g.counter)
+  strings.write_string(&builder, str)
+  delete(str)
+  save_board(&builder, g.board)
+  os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
+}
+save_board :: proc(builder: ^strings.Builder, board: Board) {
+  strings.write_int(builder, board.score)
+  strings.write_string(builder, "\n")
+  strings.write_int(builder, board.normals)
+  strings.write_string(builder, "\n")
+  strings.write_int(builder, board.longers)
+  strings.write_string(builder, "\n")
+  strings.write_int(builder, board.longests)
+  strings.write_string(builder, "\n")
+  strings.write_int(builder, board.crosses)
+  strings.write_string(builder, "\n")
+  strings.write_int(builder, board.w)
+  strings.write_string(builder, " ")
+  strings.write_int(builder, board.h)
+  strings.write_string(builder, "\n")
+  for i := 0; i < board.w; i += 1 {
+    for j := 0; j < board.h; j += 1 {
+      strings.write_int(builder, at(board, i, j))
+      strings.write_string(builder, " ")
+    }
+    strings.write_string(builder, "\n")
+  }
+  strings.write_int(builder, len(board.magic_tiles))
+  strings.write_string(builder, "\n")
+  for key, _ in board.magic_tiles {
+    strings.write_int(builder, key.first)
+    strings.write_string(builder, " ")
+    strings.write_int(builder, key.second)
+    strings.write_string(builder, " ")
+  }
+  strings.write_string(builder, "\n")
+  strings.write_int(builder, len(board.magic_tiles2))
+  strings.write_string(builder, "\n")
+  for key, _ in board.magic_tiles2 {
+    strings.write_int(builder, key.first)
+    strings.write_string(builder, " ")
+    strings.write_int(builder, key.second)
+    strings.write_string(builder, " ")
+  }
+  strings.write_string(builder, "\n")
+
+}
+load_game :: proc(g: ^Game, h: os.Handle) -> io.Error {
+  r: bufio.Reader
+  bufio.reader_init(&r, os.stream_from_handle(h))
+  defer bufio.reader_destroy(&r)
+
+  name := bufio.reader_read_string(&r, ' ') or_return
+  g.name = strings.clone(name)
+  delete(name)
+  counter_s := bufio.reader_read_string(&r, '\n') or_return
+  g.counter = strconv.atoi(counter_s)
+  delete(counter_s)
+  score_s := bufio.reader_read_string(&r, '\n') or_return
+  g.board.score = strconv.atoi(score_s)
+  delete(score_s)
+  normals_s := bufio.reader_read_string(&r, '\n') or_return
+  g.board.normals = strconv.atoi(normals_s)
+  delete(normals_s)
+  longers_s := bufio.reader_read_string(&r, '\n') or_return
+  g.board.longers = strconv.atoi(longers_s)
+  delete(longers_s)
+  longests_s := bufio.reader_read_string(&r, '\n') or_return
+  g.board.longests = strconv.atoi(longests_s)
+  delete(longests_s)
+  crosses_s := bufio.reader_read_string(&r, '\n') or_return
+  g.board.crosses = strconv.atoi(crosses_s)
+  delete(crosses_s)
+  w_s := bufio.reader_read_string(&r, ' ') or_return
+  g.board.w = strconv.atoi(w_s)
+  delete(w_s)
+  h_s := bufio.reader_read_string(&r, '\n') or_return
+  g.board.h = strconv.atoi(h_s)
+  delete(h_s)
+  resize(&g.board.board, g.board.w * g.board.h)
+  for i := 0; i < g.board.w; i += 1 {
+    for j := 0; j < g.board.h; j += 1 {
+      val_s := bufio.reader_read_string(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
+      val := strconv.atoi(val_s)
+      delete(val_s)
+      set_at(&g.board, i, j, val)
+    }
+  }
+  mt_s, _ := bufio.reader_read_string(&r, '\n')
+  mt := strconv.atoi(mt_s)
+  clear(&g.board.magic_tiles)
+  for i := 0; i < mt; i += 1 {
+    x_s := bufio.reader_read_string(&r, ' ') or_return
+    x := strconv.atoi(x_s)
+    delete(x_s)
+    y_s := bufio.reader_read_string(&r, ' ') or_return
+    y := strconv.atoi(y_s)
+    delete(y_s)
+    g.board.magic_tiles[{x, y}] = {}
+  }
+  mt2_s, _ := bufio.reader_read_string(&r, '\n')
+  mt2 := strconv.atoi(mt2_s)
+  clear(&g.board.magic_tiles2)
+  for i := 0; i < mt; i += 1 {
+    x_s := bufio.reader_read_string(&r, ' ') or_return
+    x := strconv.atoi(x_s)
+    delete(x_s)
+    y_s := bufio.reader_read_string(&r, ' ') or_return
+    y := strconv.atoi(y_s)
+    delete(y_s)
+    g.board.magic_tiles2[{x, y}] = {}
+  }
+  return nil
+}
+//std::istream &operator>>(std::istream &in, Board &b) {
+//  in >> b.score >> b.normals >> b.longers >> b.longests >> b.crosses >> b.w >>
+//      b.h
+//  b.board.resize(b.w * b.h)
+//  for (int i = 0; i < b.w; ++i) {
+//    for (int j = 0; j < b.h; ++j) {
+//      in >> b.at(i, j)
 //    }
-//    return false
 //  }
+//  int s
+//  in >> s
+//  b.magic_tiles.clear()
+//  int i, j
+//  for (int k = 0; k < s; ++k) {
+//    in >> i >> j
+//    b.magic_tiles.insert({i, j})
+//  }
+//  in >> s
+//  for (int k = 0; k < s; ++k) {
+//    in >> i >> j
+//    b.magic_tiles2.insert({i, j})
+//  }
+//  return in
+//}
+//
+load :: proc(g: ^Game) -> bool {
+  handle, err := os.open("save.txt")
+  if err == 0 {
+    g.work_board = false
+    err := load_game(g, handle)
+    if err != nil {
+      return false
+    }
+    match(g)
+    return true
+  }
+  return false
+}
 save_state :: proc(g: ^Game) {
   delete_board(&g.old_board)
   g.old_board = copy_board(g.board)
@@ -1009,9 +1100,10 @@ main :: proc() {
   rl.InitAudioDevice()
   psound := rl.LoadSound("p.ogg")
   ksound := rl.LoadSound("k.ogg")
-  // TODO: Add game loading here
-  new_game(&game)
-  input_name = true
+  if !load(&game) {
+    new_game(&game)
+    input_name = true
+  }
   builder := strings.builder_make()
   rl.SetConfigFlags({rl.ConfigFlag.WINDOW_RESIZABLE})
   rl.InitWindow(w, h, "Tiar3")
@@ -1309,10 +1401,10 @@ main :: proc() {
             input_name = true
           }
           if in_button(pos, load_button) {
-            // TODO: load game
+            load(&game)
           }
           if in_button(pos, save_button) {
-            // TODO: save game
+            save(game)
           }
           if draw_leaderboard {
             break outside
@@ -1399,11 +1491,11 @@ main :: proc() {
           }
         case .S:
           {
-            // TODO: save game
+            save(game)
           }
         case .O:
           {
-            // TODO: load game
+            load(&game)
           }
         }
       }
@@ -1430,7 +1522,7 @@ main :: proc() {
     free_all(context.temp_allocator)
   }
 
-  // TODO: save game
+  save(game)
   WriteLeaderboard(&leaderboard)
   delete(flying)
   delete(staying)
