@@ -5,25 +5,24 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:mem"
+import "core:os"
 import "core:slice"
+import "core:strconv"
 import "core:strings"
 import "core:unicode"
 import rl "vendor:raylib"
 
 Point :: distinct [2]int
-
 Pattern :: distinct [dynamic]Point
-
 SizedPattern :: struct {
   pat: Pattern,
   w:   int,
   h:   int,
 }
-
 shift :: proc(p: Pattern) -> Pattern {
   minX := max(int)
   minY := max(int)
-  for &pt in p {
+  for pt in p {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
   }
@@ -34,7 +33,6 @@ shift :: proc(p: Pattern) -> Pattern {
   }
   return res
 }
-
 rotations :: proc(p: Pattern) -> [4]Pattern {
   res: [4]Pattern
   res[0] = make(Pattern, len(p))
@@ -50,22 +48,21 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
   }
   return res
 }
-
 mirrored :: proc(p: Pattern) -> Pattern {
   m := make(Pattern, len(p))
+  copy(m[:], p[:])
   for i := 0; i < len(p); i += 1 {
     m[i].y = -p[i].y
   }
   return shift(m)
 }
-
 sized :: proc(p: Pattern) -> SizedPattern {
   res: SizedPattern
   res.pat = make(Pattern, len(p))
   copy(res.pat[:], p[:])
   maxX := min(int)
   maxY := min(int)
-  for &pt in p {
+  for pt in p {
     maxX = max(pt.x, maxX)
     maxY = max(pt.y, maxY)
   }
@@ -73,21 +70,14 @@ sized :: proc(p: Pattern) -> SizedPattern {
   res.h = int(maxY + 1)
   return res
 }
-
-generate :: proc(p: Pattern, symmetric: bool = false) -> [dynamic]SizedPattern {
+generate :: proc(p: Pattern) -> [dynamic]SizedPattern {
   s := rotations(p)
   res1 := make([dynamic]Pattern)
-  offset := 0
-  if !symmetric {
-    m := mirrored(p)
-    r := rotations(m)
-    resize(&res1, len(s) + len(r))
-    copy(res1[:], r[:])
-    offset += len(r)
-  } else {
-    resize(&res1, len(s))
-  }
-  copy(res1[offset:], s[:])
+  m := mirrored(p)
+  r := rotations(m)
+  resize(&res1, len(s) + len(r))
+  copy(res1[:], r[:])
+  copy(res1[len(r):], s[:])
   res2 := make([dynamic]SizedPattern)
   reserve(&res2, len(res1))
   for pt in res1 {
@@ -96,36 +86,32 @@ generate :: proc(p: Pattern, symmetric: bool = false) -> [dynamic]SizedPattern {
   delete(res1)
   return res2
 }
-
-three_p_1: Pattern = {{0, 0}, {1, 1}, {0, 2}}
-three_p_2: Pattern = {{1, 0}, {0, 1}, {0, 2}}
-three_p_3: Pattern = {{0, 0}, {0, 1}, {0, 3}}
-four_p: Pattern = {{0, 0}, {1, 1}, {0, 2}, {0, 3}}
-five_p_1: Pattern = {{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
-five_p_2: Pattern = {{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
-//
-threes1 := generate(three_p_1)
-threes2 := generate(three_p_2)
-threes3 := generate(three_p_3)
-fours := generate(four_p)
-fives1 := generate(five_p_1)
-fives2 := generate(five_p_2)
 threes_f :: proc() -> [dynamic]SizedPattern {
+  three_p_1: Pattern = {{0, 0}, {1, 1}, {0, 2}}
+  three_p_2: Pattern = {{1, 0}, {0, 1}, {0, 2}}
+  three_p_3: Pattern = {{0, 0}, {0, 1}, {0, 3}}
+  threes1 := generate(three_p_1)
+  threes2 := generate(three_p_2)
+  threes3 := generate(three_p_3)
   res := make([dynamic]SizedPattern, len(threes1) + len(threes2) + len(threes3))
   copy(res[:], threes1[:])
   copy(res[len(threes1):], threes2[:])
-  copy(res[len(threes1) + len(threes3):], threes3[:])
+  copy(res[len(threes1) + len(threes2):], threes3[:])
   return res
 }
-threes := threes_f()
 patterns_f :: proc() -> [dynamic]SizedPattern {
+  four_p: Pattern = {{0, 0}, {1, 1}, {0, 2}, {0, 3}}
+  five_p_1: Pattern = {{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
+  five_p_2: Pattern = {{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
+  fours := generate(four_p)
+  fives1 := generate(five_p_1)
+  fives2 := generate(five_p_2)
   res := make([dynamic]SizedPattern, len(fours) + len(fives1) + len(fives2))
   copy(res[:], fours[:])
   copy(res[len(fours):], fives1[:])
   copy(res[len(fours) + len(fives1):], fives2[:])
   return res
 }
-patterns := patterns_f()
 Pair :: struct {
   first:  int,
   second: int,
@@ -222,7 +208,7 @@ match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
   }
   return true
 }
-match_patterns :: proc(b: ^Board) {
+match_patterns :: proc(b: ^Board, patterns: [dynamic]SizedPattern) {
   clear(&b.matched_patterns)
   for sp in patterns {
     for i := 0; i <= b.w - sp.w; i += 1 {
@@ -434,7 +420,7 @@ compare_boards :: proc(b1: Board, b2: Board) -> bool {
   }
   return true
 }
-match_threes :: proc(b: ^Board) {
+match_threes :: proc(b: ^Board, threes: [dynamic]SizedPattern) {
   clear(&b.matched_threes)
   for sp in threes {
     for i := 0; i <= b.w - sp.w; i += 1 {
@@ -451,7 +437,7 @@ match_threes :: proc(b: ^Board) {
 is_three :: proc(b: Board, i, j: int) -> bool {
   return {i, j} in b.matched_threes
 }
-stabilize :: proc(b: ^Board) {
+stabilize :: proc(b: ^Board, patterns: [dynamic]SizedPattern, threes: [dynamic]SizedPattern) {
   for {
     old_board := copy_board(b^)
     defer delete_board(&old_board)
@@ -461,14 +447,14 @@ stabilize :: proc(b: ^Board) {
       break
     }
   }
-  match_patterns(b)
-  match_threes(b)
+  match_patterns(b, patterns)
+  match_threes(b, threes)
 }
-step :: proc(b: ^Board) {
+step :: proc(b: ^Board, patterns: [dynamic]SizedPattern, threes: [dynamic]SizedPattern) {
   remove_trios(b)
   fill_up(b)
-  match_patterns(b)
-  match_threes(b)
+  match_patterns(b, patterns)
+  match_threes(b, threes)
 }
 zero :: proc(b: ^Board) {
   b.score = 0
@@ -478,7 +464,6 @@ zero :: proc(b: ^Board) {
   b.crosses = 0
 }
 // New interface starts here
-
 remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   res := make([dynamic]Triple)
   if len(b.rm_i) != 0 {
@@ -705,100 +690,102 @@ LeaderboardRecord :: struct {
   score: int,
 }
 Leaderboard :: distinct [dynamic]LeaderboardRecord
-//using Leaderboard = std::vector<std::pair<std::string, int>>
-//
-//Leaderboard ReadLeaderboard() {
-//  Leaderboard res
-//  std::ifstream input("leaderboard.txt")
-//  std::string line
-//  while (std::getline(input, line)) {
-//    auto idx = line.find(';')
-//    if (idx != std::string::npos) {
-//      std::string name = line.substr(0, idx)
-//      int score = std::stoi(line.substr(idx + 1))
-//      res.emplace_back(name, score)
-//    }
-//  }
-//  std::sort(std::begin(res), std::end(res),
-//            [](auto &a, auto &b) { return a.second > b.second; })
-//  return res
-//}
-//
-//void WriteLeaderboard(Leaderboard leaderboard) {
-//  std::string text
-//  std::sort(std::begin(leaderboard), std::end(leaderboard),
-//            [](auto &a, auto &b) { return a.second > b.second; })
-//  for (auto it : leaderboard) {
-//    text += fmt::format("{};{}\n", it.first, it.second)
-//  }
-//  std::ofstream output("leaderboard.txt")
-//  output << text
-//}
-//
-//void DrawLeaderboard(Leaderboard leaderboard, size_t offset, int place) {
-//  auto w = GetRenderWidth()
-//  auto h = GetRenderHeight()
-//  auto start_y = h / 4 + 10
-//  DrawRectangle(w / 4, h / 4, w / 2, h / 2, WHITE)
-//  DrawText("Leaderboard:", w / 4 + 10, start_y, 20, BLACK)
-//  std::sort(std::begin(leaderboard), std::end(leaderboard),
-//            [](auto &a, auto &b) { return a.second > b.second; })
-//  offset = std::min(offset, leaderboard.size() - 1)
-//  auto finish = std::min(offset + 9, leaderboard.size())
-//  for (auto it = leaderboard.begin() + offset
-//       it != leaderboard.begin() + finish; ++it) {
-//    std::string text = fmt::format(
-//        "{}. {}: {}\n", (it - leaderboard.begin()) + 1, it->first, it->second)
-//    start_y += 30
-//    Color c = BLACK
-//    switch (it - leaderboard.begin()) {
-//    case 0:
-//      c = GOLD
-//      break
-//    case 1:
-//      c = GRAY
-//      break
-//    case 2:
-//      c = ORANGE
-//      break
-//    default:
-//      break
-//    }
-//    if (place == it - leaderboard.begin()) {
-//      auto width = MeasureText(text.c_str(), 20)
-//      DrawRectangle(w / 4 + 5, start_y, width + 10, 25, LIGHTGRAY)
-//    }
-//    DrawText(text.c_str(), w / 4 + 10, start_y, 20, c)
-//  }
-//  if (finish != leaderboard.size()) {
-//    DrawText("...", w / 4 + 10, start_y + 30, 20, BLACK)
-//  }
-//}
-//
+delete_leaderboard :: proc(l: ^Leaderboard) {
+  for lr in l {
+    delete(lr.name)
+  }
+}
+ReadLeaderboard :: proc() -> Leaderboard {
+  res := make(Leaderboard)
+  data, ok := os.read_entire_file("leaderboard.txt")
+  if ok {
+    lines := strings.split_lines(string(data))
+    for line in lines {
+      parts, err := strings.split(line, ";")
+      if len(parts) == 2 {
+        lr: LeaderboardRecord
+        lr.name = strings.clone(parts[0])
+        lr.score = strconv.atoi(parts[1])
+        append(&res, lr)
+      }
+      if err == .None {
+        delete(parts)
+      }
+    }
+    delete(lines)
+    delete(data)
+  }
+  slice.sort_by(res[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
+  return res
+}
+WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
+  builder := strings.builder_make()
+  defer strings.builder_destroy(&builder)
+  slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
+  for lr in leaderboard {
+    str := fmt.aprintf("%s;%d", lr.name, lr.score, newline = true)
+    strings.write_string(&builder, str)
+    delete(str)
+  }
+  os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
+}
+DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
+  w := rl.GetRenderWidth()
+  h := rl.GetRenderHeight()
+  start_y := h / 4 + 10
+  rl.DrawRectangle(w / 4, h / 4, w / 2, h / 2, rl.WHITE)
+  rl.DrawText("Leaderboard:", w / 4 + 10, start_y, 20, rl.BLACK)
+  slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
+  offset := min(offset, len(leaderboard) - 1)
+  finish := min(offset + 9, len(leaderboard))
+  for i := offset; i < finish; i += 1 {
+    lr := leaderboard[i]
+    text := fmt.ctprintf("%d. %s: %d", i, lr.name, lr.score, newline = true)
+    start_y += 30
+    c := rl.BLACK
+    switch i {
+    case 0:
+      {
+        c = rl.GOLD
+      }
+    case 1:
+      {
+        c = rl.GRAY
+      }
+    case 2:
+      {
+        c = rl.ORANGE
+      }
+    }
+    if place == i {
+      width := rl.MeasureText(text, 20)
+      rl.DrawRectangle(w / 4 + 5, start_y, width + 10, 25, rl.LIGHTGRAY)
+    }
+    rl.DrawText(text, w / 4 + 10, start_y, 20, c)
+  }
+  if finish != len(leaderboard) {
+    rl.DrawText("...", w / 4 + 10, start_y + 30, 20, rl.BLACK)
+  }
+}
 Button :: struct {
   x1: f32,
   y1: f32,
   x2: f32,
   y2: f32,
 }
-
 in_button :: proc(pos: rl.Vector2, button: Button) -> bool {
   return pos.x > button.x1 && pos.x < button.x2 && pos.y > button.y1 && pos.y < button.y2
 }
-
 button_maker_enter := true
-
 ButtonMaker :: struct {
   play_sound: bool,
   sound:      rl.Sound,
   volume:     f32,
   buttons:    [dynamic]Button,
 }
-
 delete_button_maker :: proc(bm: ^ButtonMaker) {
   delete(bm.buttons)
 }
-
 draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool) -> Button {
   button_down := rl.IsMouseButtonDown(rl.MouseButton.LEFT)
   pos := rl.GetMousePosition()
@@ -832,7 +819,6 @@ draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool
   append(&bm.buttons, button)
   return button
 }
-
 play_sound :: proc(bm: ButtonMaker) {
   if !bm.play_sound {
     return
@@ -854,7 +840,6 @@ play_sound :: proc(bm: ButtonMaker) {
     button_maker_enter = true
   }
 }
-
 Game :: struct {
   name:          string,
   board:         Board,
@@ -863,26 +848,24 @@ Game :: struct {
   first_work:    bool,
   removed_cells: [dynamic]Triple,
   counter:       int,
+  patterns:      [dynamic]SizedPattern,
+  threes:        [dynamic]SizedPattern,
 }
-
 make_game :: proc(size: int) -> Game {
   board := make_board(size, size)
   return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple), name = ""}
 }
-
 delete_game :: proc(g: ^Game) {
   delete_board(&g.board)
   delete_board(&g.old_board)
 }
-
 new_game :: proc(g: ^Game) {
   g.counter = 0
   g.work_board = false
   fill(&g.board)
-  stabilize(&g.board)
+  stabilize(&g.board, g.patterns, g.threes)
   zero(&g.board)
 }
-
 //  void save() {
 //    std::ofstream save("save.txt")
 //    save << _name << " " << counter << "\n"
@@ -899,26 +882,21 @@ new_game :: proc(g: ^Game) {
 //    }
 //    return false
 //  }
-
 save_state :: proc(g: ^Game) {
   delete_board(&g.old_board)
   g.old_board = copy_board(g.board)
 }
-
 check_state :: proc(g: Game) -> bool {
   return compare_boards(g.old_board, g.board)
 }
-
 restore_state :: proc(g: ^Game) {
   delete_board(&g.board)
   g.board = copy_board(g.old_board)
 }
-
 match :: proc(g: ^Game) {
-  match_patterns(&g.board)
-  match_threes(&g.board)
+  match_patterns(&g.board, g.patterns)
+  match_threes(&g.board, g.threes)
 }
-
 attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
   g.first_work = true
   g.work_board = true
@@ -926,7 +904,6 @@ attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
   swap(&g.board, row1, col1, row2, col2)
   prepare_removals(&g.board)
 }
-
 step_game :: proc(g: ^Game) -> [dynamic]Triple {
   res: [dynamic]Triple
   if !has_removals(g.board) {
@@ -946,15 +923,12 @@ step_game :: proc(g: ^Game) -> [dynamic]Triple {
   g.first_work = false
   return res
 }
-
 is_finished :: proc(g: Game) -> bool {
   return g.counter == 50
 }
-
 is_processing :: proc(g: Game) -> bool {
   return g.work_board
 }
-
 game_stats :: proc(g: Game) -> string {
   return fmt.tprintf(
     "Moves: %d\nScore: %d\nTrios: %d\nQuartets: %d\nQuintets: %d\nCrosses: %d",
@@ -966,7 +940,6 @@ game_stats :: proc(g: Game) -> string {
     g.board.crosses,
   )
 }
-
 Particle :: struct {
   dx:       f32,
   dy:       f32,
@@ -978,19 +951,16 @@ Particle :: struct {
   lifetime: int,
   sides:    int,
 }
-
 Explosion :: struct {
   x:        int,
   y:        int,
   lifetime: int,
 }
-
 button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
   if in_button(pos, button) {
     flag^ = !flag^
   }
 }
-
 main :: proc() {
   when ODIN_DEBUG {
     track: mem.Tracking_Allocator
@@ -1007,10 +977,16 @@ main :: proc() {
       mem.tracking_allocator_destroy(&track)
     }
   }
+  patterns := patterns_f()
+  defer delete(patterns)
+  threes := threes_f()
+  defer delete(threes)
   w: i32 = 1280
   h: i32 = 800
   board_size := 16
   game := make_game(board_size)
+  game.patterns = patterns
+  game.threes = threes
   defer delete_game(&game)
   first_click := true
   saved_row: i32 = 0
@@ -1026,7 +1002,7 @@ main :: proc() {
   l_offset := 0
   volume: f32 = 0.0
   leaderboard_place := -1
-  leaderboard: Leaderboard
+  leaderboard := ReadLeaderboard()
   flying := make([dynamic]Particle)
   staying := make([dynamic]Explosion)
   dd := proc() -> int {return rand.int_max(21) - 10}
@@ -1220,7 +1196,7 @@ main :: proc() {
     }
     if input_name {
       c := rl.GetCharPressed()
-      if unicode.is_alpha(c) || c == '_' && len(game.name) < 22 && !ignore_r {
+      if unicode.is_alpha(c) || unicode.is_number(c) || c == '_' && len(game.name) < 22 && !ignore_r {
         strings.write_rune(&builder, c)
       }
       ignore_r = false
@@ -1246,7 +1222,7 @@ main :: proc() {
         }
         l_offset = min(l_offset, len(leaderboard) - 1)
       }
-      //      DrawLeaderboard(leaderboard, l_offset, leaderboard_place)
+      DrawLeaderboard(&leaderboard, l_offset, leaderboard_place)
     }
     rl.DrawText(fmt.ctprintf("%s", game_stats(game)), 3, 0, 30, rl.BLACK)
     rl.DrawText(fmt.ctprintf("Player:\n%s", game.name), 3, h - 55, 20, rl.BLACK)
@@ -1436,7 +1412,7 @@ main :: proc() {
     if is_finished(game) {
       for lr, idx in leaderboard {
         if lr.score < game.board.score {
-          assign_at(&leaderboard, idx, LeaderboardRecord{game.name, game.board.score})
+          inject_at(&leaderboard, idx, LeaderboardRecord{game.name, game.board.score})
           leaderboard_place = idx
           l_offset = max(0, idx - 4)
           break
@@ -1447,7 +1423,7 @@ main :: proc() {
         append(&leaderboard, LeaderboardRecord{game.name, game.board.score})
         l_offset = max(0, leaderboard_place - 4)
       }
-      // TODO: write leaderboard
+      WriteLeaderboard(&leaderboard)
       new_game(&game)
       draw_leaderboard = true
     }
@@ -1455,9 +1431,11 @@ main :: proc() {
   }
 
   // TODO: save game
-  // TODO: write leaderboard
+  WriteLeaderboard(&leaderboard)
   delete(flying)
   delete(staying)
+  delete_leaderboard(&leaderboard)
+  delete(leaderboard)
   strings.builder_destroy(&builder)
   rl.CloseWindow()
   rl.CloseAudioDevice()
