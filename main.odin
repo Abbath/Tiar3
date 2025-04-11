@@ -41,6 +41,7 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
   copy(res[0][:], p[:])
   for i := 1; i < 4; i += 1 {
     rotated := make(Pattern, len(p))
+    defer delete(rotated)
     for j := 0; j < len(p); j += 1 {
       rotated[j].x = res[i - 1][j].y
       rotated[j].y = -res[i - 1][j].x
@@ -75,16 +76,18 @@ sized :: proc(p: Pattern) -> SizedPattern {
 
 generate :: proc(p: Pattern, symmetric: bool = false) -> [dynamic]SizedPattern {
   s := rotations(p)
-  res1: [dynamic]Pattern
+  res1 := make([dynamic]Pattern)
+  offset := 0
   if !symmetric {
     m := mirrored(p)
     r := rotations(m)
     resize(&res1, len(s) + len(r))
     copy(res1[:], r[:])
+    offset += len(r)
   } else {
     resize(&res1, len(s))
   }
-  copy(res1[:], s[:])
+  copy(res1[offset:], s[:])
   res2 := make([dynamic]SizedPattern)
   reserve(&res2, len(res1))
   for pt in res1 {
@@ -880,7 +883,6 @@ new_game :: proc(g: ^Game) {
   zero(&g.board)
 }
 
-
 //  void save() {
 //    std::ofstream save("save.txt")
 //    save << _name << " " << counter << "\n"
@@ -1040,7 +1042,7 @@ main :: proc() {
   icon := rl.LoadImage("icon.png")
   rl.SetWindowIcon(icon)
   rl.SetTargetFPS(60)
-  rl.SetTextLineSpacing(23)
+  // rl.SetTextLineSpacing(23)
   for !rl.WindowShouldClose() {
     rl.SetMasterVolume(volume)
     if frame_counter == 60 {
@@ -1454,6 +1456,8 @@ main :: proc() {
 
   // TODO: save game
   // TODO: write leaderboard
+  delete(flying)
+  delete(staying)
   strings.builder_destroy(&builder)
   rl.CloseWindow()
   rl.CloseAudioDevice()
