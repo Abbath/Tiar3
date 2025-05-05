@@ -781,57 +781,31 @@ new_game :: proc(g: ^Game) {
   stabilize(&g.board, g.patterns, g.threes)
   zero(&g.board)
 }
-save :: proc(g: Game) {
-  builder := strings.builder_make()
-  defer strings.builder_destroy(&builder)
+save :: proc(g: Game, auto_clean: bool = false) {
+  builder := strings.builder_make(context.temp_allocator)
   fmt.sbprintf(&builder, "%s %d\n", g.name, g.counter)
   save_board(&builder, g.board)
   os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
+  if auto_clean do free_all(context.temp_allocator)
 }
 save_board :: proc(b: ^strings.Builder, board: Board) {
-  wi := strings.write_int
-  ws := strings.write_string
-  wi(b, board.score)
-  ws(b, "\n")
-  wi(b, board.normals)
-  ws(b, "\n")
-  wi(b, board.longers)
-  ws(b, "\n")
-  wi(b, board.longests)
-  ws(b, "\n")
-  wi(b, board.crosses)
-  ws(b, "\n")
-  wi(b, board.w)
-  ws(b, " ")
-  wi(b, board.h)
-  ws(b, "\n")
+  fmt.sbprintf(b, "%d\n%d\n%d\n%d\n%d\n%d %d\n", board.score, board.normals, board.longers, board.longests, board.crosses, board.w, board.h)
   for i := 0; i < board.w; i += 1 {
     for j := 0; j < board.h; j += 1 {
-      wi(b, at(board, i, j))
-      ws(b, " ")
+      fmt.sbprintf(b, "%d ", at(board, i, j))
     }
-    ws(b, "\n")
+    fmt.sbprintf(b, "\n")
   }
-  wi(b, len(board.magic_tiles))
-  ws(b, "\n")
+  fmt.sbprintf(b, "%d\n", len(board.magic_tiles))
   for key, _ in board.magic_tiles {
-    wi(b, key.first)
-    ws(b, " ")
-    wi(b, key.second)
-    ws(b, " ")
+    fmt.sbprintf(b, "%d %d ", key.first, key.second)
   }
-  ws(b, "\n")
-  wi(b, len(board.magic_tiles2))
-  ws(b, "\n")
+  fmt.sbprintf(b, "\n%d\n", len(board.magic_tiles2))
   for key, _ in board.magic_tiles2 {
-    wi(b, key.first)
-    ws(b, " ")
-    wi(b, key.second)
-    ws(b, " ")
+    fmt.sbprintf(b, "%d %d ", key.first, key.second)
   }
-  ws(b, "\n")
+  fmt.sbprintf(b, "\n")
 }
-
 load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error {
   read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, err: io.Error) {
     temp_s := bufio.reader_read_string(r, u8(delim), context.temp_allocator) or_return
@@ -863,7 +837,7 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error 
     y := read_value(&r, ' ') or_return
     g.board.magic_tiles[{x, y}] = {}
   }
-  mt2 := read_value(&r) or_return
+  mt = read_value(&r) or_return
   clear(&g.board.magic_tiles2)
   for i := 0; i < mt; i += 1 {
     x := read_value(&r, ' ') or_return
@@ -1384,7 +1358,7 @@ main :: proc() {
     free_all(context.temp_allocator)
   }
 
-  save(game)
+  save(game, true)
   WriteLeaderboard(&leaderboard)
   delete(flying)
   delete(staying)
