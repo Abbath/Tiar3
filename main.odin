@@ -280,9 +280,7 @@ remove_trios :: proc(b: ^Board) {
     }
   }
   for t in remove_i {
-    i := t.first
-    j := t.second
-    offset := t.third
+    i, j, offset := t.first, t.second, t.third
     b.normals += 1
     if offset == 4 {
       j = 0
@@ -312,8 +310,7 @@ remove_trios :: proc(b: ^Board) {
     }
   }
   for t in remove_j {
-    i := t.first
-    j := t.second
+    i, j := t.first, t.second
     offset := t.third
     b.normals += 1
     if offset == 4 {
@@ -345,14 +342,9 @@ remove_trios :: proc(b: ^Board) {
   }
   for i := 0; i < len(remove_i); i += 1 {
     for j := 0; j < len(remove_j); j += 1 {
-      t1 := remove_i[i]
-      t2 := remove_j[j]
-      i1 := t1.first
-      j1 := t1.second
-      o1 := t1.third
-      i2 := t2.first
-      j2 := t2.second
-      o2 := t2.third
+      t1, t2 := remove_i[i], remove_j[j]
+      i1, j1, o1 := t1.first, t1.second, t1.third
+      i2, j2, o2 := t2.first, t2.second, t2.third
       if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
         for m := -1; m < 2; m += 1 {
           for n := -1; n < 2; n += 1 {
@@ -453,8 +445,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   res := make([dynamic]Triple)
   if len(b.rm_i) != 0 {
     t := b.rm_i[len(b.rm_i) - 1]
-    i := t.first
-    j := t.second
+    i, j := t.first, t.second
     offset := t.third
     if offset == 4 {
       j = 0
@@ -499,8 +490,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   }
   if len(b.rm_j) != 0 {
     t := b.rm_j[len(b.rm_j) - 1]
-    i := t.first
-    j := t.second
+    i, j := t.first, t.second
     offset := t.third
     if offset == 4 {
       i = 0
@@ -545,8 +535,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   }
   if len(b.rm_b) != 0 {
     t := b.rm_b[len(b.rm_b) - 1]
-    i := t.first
-    j := t.second
+    i, j := t.first, t.second
     for m := -2; m < 3; m += 1 {
       for n := -2; n < 3; n += 1 {
         if reasonable_coord(b^, i + m, j + n) {
@@ -585,14 +574,9 @@ prepare_removals :: proc(b: ^Board) {
   }
   for i := 0; i < len(b.rm_i); i += 1 {
     for j := 0; j < len(b.rm_j); j += 1 {
-      t1 := b.rm_i[i]
-      t2 := b.rm_j[j]
-      i1 := t1.first
-      j1 := t1.second
-      o1 := t1.third
-      i2 := t2.first
-      j2 := t2.second
-      o2 := t2.third
+      t1, t2 := b.rm_i[i], b.rm_j[j]
+      i1, j1, o1 := t1.first, t1.second, t1.third
+      i2, j2, o2 := t2.first, t2.second, t2.third
       if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) do append(&b.rm_b, Pair{i1, j2})
     }
   }
