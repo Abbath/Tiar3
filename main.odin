@@ -777,6 +777,7 @@ new_game :: proc(g: ^Game) {
 }
 save :: proc(g: Game, auto_clean: bool = false) {
   builder := strings.builder_make(context.temp_allocator)
+  fmt.println(g.name)
   fmt.sbprintf(&builder, "%s %d\n", g.name, g.counter)
   save_board(&builder, g.board)
   os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
@@ -808,7 +809,8 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error 
   r: bufio.Reader
   bufio.reader_init(&r, os.stream_from_handle(h))
   defer bufio.reader_destroy(&r)
-  g.name = bufio.reader_read_string(&r, ' ', context.temp_allocator) or_return
+  name_tmp := bufio.reader_read_string(&r, ' ', context.temp_allocator) or_return
+  g.name = strings.clone(name_tmp)
   g.counter = read_value(&r) or_return
   g.board.score = read_value(&r) or_return
   g.board.normals = read_value(&r) or_return
