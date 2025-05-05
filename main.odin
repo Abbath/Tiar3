@@ -1089,35 +1089,44 @@ main :: proc() {
         pos_x := board_x + saved_col * ss + so
         pos_y := board_y + saved_row * ss + so
         if dx == 1 && dy == 0 || dx == 0 && dy == 1 {
-          if dx == 1 {
-            rl.DrawRectangleGradientH(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss : 20, dy == 1 ? ss : 20, rl.BLANK, rl.MAROON)
-          } else {
-            rl.DrawRectangleGradientV(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss : 20, dy == 1 ? ss : 20, rl.BLANK, rl.MAROON)
-          }
-          rl.DrawPoly({f32(pos_x + radius + (dx == 1 ? ss : 0)), f32(pos_y + radius + (dy == 1 ? ss : 0))}, 3, f32(radius) - mo, dx == 1 ? 0 : 90, rl.MAROON)
+          (dx == 1 ? rl.DrawRectangleGradientH : rl.DrawRectangleGradientV)(
+            pos_x + radius - 10,
+            pos_y + radius - 10,
+            dx == 1 ? ss / 2 : 20,
+            dy == 1 ? ss / 2 : 20,
+            rl.BLANK,
+            rl.MAROON,
+          )
+          rl.DrawPoly(
+            {f32(pos_x + radius + (dx == 1 ? ss / 2 : 0)), f32(pos_y + radius + (dy == 1 ? ss / 2 : 0))},
+            3,
+            f32(radius) - mo,
+            dx == 1 ? 0 : 90,
+            rl.MAROON,
+          )
         }
         if dx == -1 && dy == 0 || dx == 0 && dy == -1 {
-          if (dx == -1) {
+          if dx == -1 {
             rl.DrawRectangleGradientH(
-              pos_x + radius - (dx == -1 ? ss - 10 : 0),
-              pos_y + radius - (dy == -1 ? ss : 10),
-              dx == -1 ? ss : 20,
-              dy == -1 ? ss + 10 : 20,
+              pos_x + radius - (dx == -1 ? ss / 2 - 10 : 0),
+              pos_y + radius - (dy == -1 ? ss / 2 : 10),
+              dx == -1 ? ss / 2 : 20,
+              dy == -1 ? ss / 2 + 10 : 20,
               rl.MAROON,
               rl.BLANK,
             )
           } else {
             rl.DrawRectangleGradientV(
-              pos_x + radius - (dx == -1 ? ss : 10),
-              pos_y + radius - (dy == -1 ? ss - 10 : 0),
-              dx == -1 ? ss + 10 : 20,
-              dy == -1 ? ss : 20,
+              pos_x + radius - (dx == -1 ? ss / 2 : 10),
+              pos_y + radius - (dy == -1 ? ss / 2 - 10 : 0),
+              dx == -1 ? ss / 2 + 10 : 20,
+              dy == -1 ? ss / 2 : 20,
               rl.MAROON,
               rl.BLANK,
             )
           }
           rl.DrawPoly(
-            {f32(pos_x + radius - (dx == -1 ? ss : 0)), f32(pos_y + radius - (dy == -1 ? ss : 0))},
+            {f32(pos_x + radius - (dx == -1 ? ss / 2 : 0)), f32(pos_y + radius - (dy == -1 ? ss / 2 : 0))},
             3,
             f32(radius) - mo,
             dx == -1 ? 180 : 270,
@@ -1143,7 +1152,7 @@ main :: proc() {
         if ku do wheel_move = 1
       }
       if wheel_move != 0 {
-        if l_offset != 0 || wheel_move <= 0 do l_offset = l_offset - (wheel_move < 0 ? -1 : 1)
+        if l_offset != 0 || wheel_move <= 0 do l_offset -= wheel_move < 0 ? -1 : 1
         l_offset = min(l_offset, len(leaderboard) - 1)
       }
       DrawLeaderboard(&leaderboard, l_offset, leaderboard_place)
@@ -1156,22 +1165,19 @@ main :: proc() {
       volume     = volume,
     }
     defer delete_button_maker(&bm)
-    start_y: i32 = 40
-    sound_button := draw_button(&bm, {w - 210, h - start_y}, "SOUND", true)
-    start_y += 40
-    particles_button := draw_button(&bm, {w - 210, h - start_y}, "PARTICLES", particles)
-    start_y += 40
-    hints_button := draw_button(&bm, {w - 210, h - start_y}, "HINTS", hints)
-    start_y += 40
-    acid_button := draw_button(&bm, {w - 210, h - start_y}, "NO ACID", nonacid_colors)
-    start_y += 40
-    lbutton := draw_button(&bm, {w - 210, h - start_y}, "LEADERBOARD", draw_leaderboard)
-    start_y += 40
-    rbutton := draw_button(&bm, {w - 210, h - start_y}, "RESTART", false)
-    start_y += 40
-    load_button := draw_button(&bm, {w - 210, h - start_y}, "LOAD", false)
-    start_y += 40
-    save_button := draw_button(&bm, {w - 210, h - start_y}, "SAVE", false)
+    start_y: i32 = 0
+    inc :: proc(var: ^i32, val: i32) -> i32 {
+      var^ += val
+      return var^
+    }
+    sound_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "SOUND", true)
+    particles_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "PARTICLES", particles)
+    hints_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "HINTS", hints)
+    acid_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "NO ACID", nonacid_colors)
+    lbutton := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "LEADERBOARD", draw_leaderboard)
+    rbutton := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "RESTART", false)
+    load_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "LOAD", false)
+    save_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "SAVE", false)
     play_sound(bm)
     volume = bm.volume
     if volume < 0.05 do volume = 0
