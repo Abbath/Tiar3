@@ -235,7 +235,6 @@ swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
   tmp := at(b^, x1, y1)
   set_at(b, x1, y1, at(b^, x2, y2))
   set_at(b, x2, y2, tmp)
-
   if is_magic(b^, x1, y1) {
     delete_key(&b.magic_tiles, Pair{x1, y1})
     b.magic_tiles[{x2, y2}] = {}
@@ -284,6 +283,7 @@ remove_trios :: proc(b: ^Board) {
     i := t.first
     j := t.second
     offset := t.third
+    b.normals += 1
     if offset == 4 {
       j = 0
       offset = b.h
@@ -310,12 +310,12 @@ remove_trios :: proc(b: ^Board) {
       b.longests += 1
       b.normals = max(0, b.normals - 1)
     }
-    b.normals += 1
   }
   for t in remove_j {
     i := t.first
     j := t.second
     offset := t.third
+    b.normals += 1
     if offset == 4 {
       i = 0
       offset = b.w
@@ -342,7 +342,6 @@ remove_trios :: proc(b: ^Board) {
       b.longests += 1
       b.normals = max(0, b.normals - 1)
     }
-    b.normals += 1
   }
   for i := 0; i < len(remove_i); i += 1 {
     for j := 0; j < len(remove_j); j += 1 {
@@ -777,7 +776,6 @@ new_game :: proc(g: ^Game) {
 }
 save :: proc(g: Game, auto_clean: bool = false) {
   builder := strings.builder_make(context.temp_allocator)
-  fmt.println(g.name)
   fmt.sbprintf(&builder, "%s %d\n", g.name, g.counter)
   save_board(&builder, g.board)
   os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
@@ -934,7 +932,6 @@ main :: proc() {
     track: mem.Tracking_Allocator
     mem.tracking_allocator_init(&track, context.allocator)
     context.allocator = mem.tracking_allocator(&track)
-
     defer {
       if len(track.allocation_map) > 0 {
         fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
@@ -1197,7 +1194,6 @@ main :: proc() {
       delete(staying)
       shrink(&new_staying)
       staying = new_staying
-
       new_flying := make([dynamic]Particle)
       reserve(&new_flying, len(flying))
       for it in flying {
@@ -1298,7 +1294,6 @@ main :: proc() {
         }
       }
     }
-
     if is_finished(game) {
       for lr, idx in leaderboard {
         if lr.score < game.board.score {
@@ -1319,7 +1314,6 @@ main :: proc() {
     }
     free_all(context.temp_allocator)
   }
-
   save(game, true)
   WriteLeaderboard(&leaderboard)
   delete(flying)
