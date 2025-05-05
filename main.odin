@@ -204,9 +204,7 @@ set_at :: proc(brd: ^Board, a, b, v: int) {
 match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
   for i := 1; i < len(p.pat); i += 1 {
-    if color != at(b, x + p.pat[i].x, y + p.pat[i].y) {
-      return false
-    }
+    if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   }
   return true
 }
@@ -275,15 +273,11 @@ remove_trios :: proc(b: ^Board) {
       for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) {
         offset_j += 1
       }
-      if offset_j > 2 {
-        append(&remove_i, Triple{i, j, offset_j})
-      }
+      if offset_j > 2 do append(&remove_i, Triple{i, j, offset_j})
       for (i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j)) {
         offset_i += 1
       }
-      if offset_i > 2 {
-        append(&remove_j, Triple{i, j, offset_i})
-      }
+      if offset_i > 2 do append(&remove_j, Triple{i, j, offset_i})
     }
   }
   for t in remove_i {
@@ -400,25 +394,17 @@ fill_up :: proc(b: ^Board) {
         }
         for k := curr_i; k >= 0; k -= 1 {
           set_at(b, k, j, uniform_dist())
-          if coin() == 1 {
-            b.magic_tiles[{k, j}] = {}
-          }
-          if coin2() == 1 {
-            b.magic_tiles2[{k, j}] = {}
-          }
+          if coin() == 1 do b.magic_tiles[{k, j}] = {}
+          if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
         }
       }
     }
   }
 }
 compare_boards :: proc(b1: Board, b2: Board) -> bool {
-  if b1.w != b2.w || b1.h != b2.h {
-    return false
-  }
+  if b1.w != b2.w || b1.h != b2.h do return false
   for i := 0; i < b1.w * b1.h; i += 1 {
-    if b1.board[i] != b2.board[i] {
-      return false
-    }
+    if b1.board[i] != b2.board[i] do return false
   }
   return true
 }
@@ -445,9 +431,7 @@ stabilize :: proc(b: ^Board, patterns: [dynamic]SizedPattern, threes: [dynamic]S
     defer delete_board(&old_board)
     remove_trios(b)
     fill_up(b)
-    if compare_boards(old_board, b^) {
-      break
-    }
+    if compare_boards(old_board, b^) do break
   }
   match_patterns(b, patterns)
   match_threes(b, threes)
@@ -500,9 +484,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
         for {
           x = uniform_dist_2(b^)
           y = uniform_dist_3(b^)
-          if !({x, y} in r) {
-            break
-          }
+          if !({x, y} in r) do break
         }
         r[{x, y}] = {}
         append(&res, Triple{x, y, at(b^, x, y)})
@@ -548,9 +530,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
         for {
           x = uniform_dist_2(b^)
           y = uniform_dist_3(b^)
-          if !({x, y} in r) {
-            break
-          }
+          if !({x, y} in r) do break
         }
         r[{x, y}] = {}
         append(&res, Triple{x, y, at(b^, x, y)})
@@ -597,15 +577,11 @@ prepare_removals :: proc(b: ^Board) {
       for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) {
         offset_j += 1
       }
-      if offset_j > 2 {
-        append(&b.rm_i, Triple{i, j, offset_j})
-      }
+      if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
       for i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j) {
         offset_i += 1
       }
-      if offset_i > 2 {
-        append(&b.rm_j, Triple{i, j, offset_i})
-      }
+      if offset_i > 2 do append(&b.rm_j, Triple{i, j, offset_i})
     }
   }
   for i := 0; i < len(b.rm_i); i += 1 {
@@ -618,9 +594,7 @@ prepare_removals :: proc(b: ^Board) {
       i2 := t2.first
       j2 := t2.second
       o2 := t2.third
-      if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
-        append(&b.rm_b, Pair{i1, j2})
-      }
+      if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) do append(&b.rm_b, Pair{i1, j2})
     }
   }
   slice.sort_by(b.rm_i[:], proc(a, b: Triple) -> bool {
@@ -649,22 +623,20 @@ delete_leaderboard :: proc(l: ^Leaderboard) {
 ReadLeaderboard :: proc() -> Leaderboard {
   res := make(Leaderboard)
   data, ok := os.read_entire_file("leaderboard.txt")
+  defer if ok do delete(data)
   if ok {
     lines := strings.split_lines(string(data))
+    defer delete(lines)
     for line in lines {
       parts, err := strings.split(line, ";")
+      defer if err == .None do delete(parts)
       if len(parts) == 2 {
         lr: LeaderboardRecord
         lr.name = strings.clone(parts[0])
         lr.score = strconv.atoi(parts[1])
         append(&res, lr)
       }
-      if err == .None {
-        delete(parts)
-      }
     }
-    delete(lines)
-    delete(data)
   }
   slice.sort_by(res[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
   return res
@@ -714,9 +686,7 @@ DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
     }
     rl.DrawText(text, w / 4 + 10, start_y, 20, c)
   }
-  if finish != len(leaderboard) {
-    rl.DrawText("...", w / 4 + 10, start_y + 30, 20, rl.BLACK)
-  }
+  if finish != len(leaderboard) do rl.DrawText("...", w / 4 + 10, start_y + 30, 20, rl.BLACK)
 }
 Button :: struct {
   x1: f32,
@@ -771,9 +741,7 @@ draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool
   return button
 }
 play_sound :: proc(bm: ButtonMaker) {
-  if !bm.play_sound {
-    return
-  }
+  if !bm.play_sound do return
   inn := false
   for it in bm.buttons {
     pos := rl.GetMousePosition()
@@ -781,15 +749,11 @@ play_sound :: proc(bm: ButtonMaker) {
       inn = true
       if button_maker_enter {
         button_maker_enter = false
-        if (rl.IsSoundReady(bm.sound)) {
-          rl.PlaySound(bm.sound)
-        }
+        if (rl.IsSoundReady(bm.sound)) do rl.PlaySound(bm.sound)
       }
     }
   }
-  if !inn {
-    button_maker_enter = true
-  }
+  if !inn do button_maker_enter = true
 }
 Game :: struct {
   name:          string,
@@ -820,154 +784,101 @@ new_game :: proc(g: ^Game) {
 save :: proc(g: Game) {
   builder := strings.builder_make()
   defer strings.builder_destroy(&builder)
-  str := fmt.aprintf("%s %d\n", g.name, g.counter)
-  strings.write_string(&builder, str)
-  delete(str)
+  fmt.sbprintf(&builder, "%s %d\n", g.name, g.counter)
   save_board(&builder, g.board)
   os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
 }
-save_board :: proc(builder: ^strings.Builder, board: Board) {
-  strings.write_int(builder, board.score)
-  strings.write_string(builder, "\n")
-  strings.write_int(builder, board.normals)
-  strings.write_string(builder, "\n")
-  strings.write_int(builder, board.longers)
-  strings.write_string(builder, "\n")
-  strings.write_int(builder, board.longests)
-  strings.write_string(builder, "\n")
-  strings.write_int(builder, board.crosses)
-  strings.write_string(builder, "\n")
-  strings.write_int(builder, board.w)
-  strings.write_string(builder, " ")
-  strings.write_int(builder, board.h)
-  strings.write_string(builder, "\n")
+save_board :: proc(b: ^strings.Builder, board: Board) {
+  wi := strings.write_int
+  ws := strings.write_string
+  wi(b, board.score)
+  ws(b, "\n")
+  wi(b, board.normals)
+  ws(b, "\n")
+  wi(b, board.longers)
+  ws(b, "\n")
+  wi(b, board.longests)
+  ws(b, "\n")
+  wi(b, board.crosses)
+  ws(b, "\n")
+  wi(b, board.w)
+  ws(b, " ")
+  wi(b, board.h)
+  ws(b, "\n")
   for i := 0; i < board.w; i += 1 {
     for j := 0; j < board.h; j += 1 {
-      strings.write_int(builder, at(board, i, j))
-      strings.write_string(builder, " ")
+      wi(b, at(board, i, j))
+      ws(b, " ")
     }
-    strings.write_string(builder, "\n")
+    ws(b, "\n")
   }
-  strings.write_int(builder, len(board.magic_tiles))
-  strings.write_string(builder, "\n")
+  wi(b, len(board.magic_tiles))
+  ws(b, "\n")
   for key, _ in board.magic_tiles {
-    strings.write_int(builder, key.first)
-    strings.write_string(builder, " ")
-    strings.write_int(builder, key.second)
-    strings.write_string(builder, " ")
+    wi(b, key.first)
+    ws(b, " ")
+    wi(b, key.second)
+    ws(b, " ")
   }
-  strings.write_string(builder, "\n")
-  strings.write_int(builder, len(board.magic_tiles2))
-  strings.write_string(builder, "\n")
+  ws(b, "\n")
+  wi(b, len(board.magic_tiles2))
+  ws(b, "\n")
   for key, _ in board.magic_tiles2 {
-    strings.write_int(builder, key.first)
-    strings.write_string(builder, " ")
-    strings.write_int(builder, key.second)
-    strings.write_string(builder, " ")
+    wi(b, key.first)
+    ws(b, " ")
+    wi(b, key.second)
+    ws(b, " ")
   }
-  strings.write_string(builder, "\n")
-
+  ws(b, "\n")
 }
-load_game :: proc(g: ^Game, h: os.Handle) -> io.Error {
+
+load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error {
+  read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, err: io.Error) {
+    temp_s := bufio.reader_read_string(r, u8(delim), context.temp_allocator) or_return
+    return strconv.atoi(temp_s), nil
+  }
   r: bufio.Reader
   bufio.reader_init(&r, os.stream_from_handle(h))
   defer bufio.reader_destroy(&r)
-
-  name := bufio.reader_read_string(&r, ' ') or_return
-  g.name = strings.clone(name)
-  delete(name)
-  counter_s := bufio.reader_read_string(&r, '\n') or_return
-  g.counter = strconv.atoi(counter_s)
-  delete(counter_s)
-  score_s := bufio.reader_read_string(&r, '\n') or_return
-  g.board.score = strconv.atoi(score_s)
-  delete(score_s)
-  normals_s := bufio.reader_read_string(&r, '\n') or_return
-  g.board.normals = strconv.atoi(normals_s)
-  delete(normals_s)
-  longers_s := bufio.reader_read_string(&r, '\n') or_return
-  g.board.longers = strconv.atoi(longers_s)
-  delete(longers_s)
-  longests_s := bufio.reader_read_string(&r, '\n') or_return
-  g.board.longests = strconv.atoi(longests_s)
-  delete(longests_s)
-  crosses_s := bufio.reader_read_string(&r, '\n') or_return
-  g.board.crosses = strconv.atoi(crosses_s)
-  delete(crosses_s)
-  w_s := bufio.reader_read_string(&r, ' ') or_return
-  g.board.w = strconv.atoi(w_s)
-  delete(w_s)
-  h_s := bufio.reader_read_string(&r, '\n') or_return
-  g.board.h = strconv.atoi(h_s)
-  delete(h_s)
+  g.name = bufio.reader_read_string(&r, ' ', context.temp_allocator) or_return
+  g.counter = read_value(&r) or_return
+  g.board.score = read_value(&r) or_return
+  g.board.normals = read_value(&r) or_return
+  g.board.longers = read_value(&r) or_return
+  g.board.longests = read_value(&r) or_return
+  g.board.crosses = read_value(&r) or_return
+  g.board.w = read_value(&r, ' ') or_return
+  g.board.h = read_value(&r) or_return
   resize(&g.board.board, g.board.w * g.board.h)
   for i := 0; i < g.board.w; i += 1 {
     for j := 0; j < g.board.h; j += 1 {
-      val_s := bufio.reader_read_string(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
-      val := strconv.atoi(val_s)
-      delete(val_s)
+      val := read_value(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
       set_at(&g.board, i, j, val)
     }
   }
-  mt_s, _ := bufio.reader_read_string(&r, '\n')
-  mt := strconv.atoi(mt_s)
+  mt := read_value(&r) or_return
   clear(&g.board.magic_tiles)
   for i := 0; i < mt; i += 1 {
-    x_s := bufio.reader_read_string(&r, ' ') or_return
-    x := strconv.atoi(x_s)
-    delete(x_s)
-    y_s := bufio.reader_read_string(&r, ' ') or_return
-    y := strconv.atoi(y_s)
-    delete(y_s)
+    x := read_value(&r, ' ') or_return
+    y := read_value(&r, ' ') or_return
     g.board.magic_tiles[{x, y}] = {}
   }
-  mt2_s, _ := bufio.reader_read_string(&r, '\n')
-  mt2 := strconv.atoi(mt2_s)
+  mt2 := read_value(&r) or_return
   clear(&g.board.magic_tiles2)
   for i := 0; i < mt; i += 1 {
-    x_s := bufio.reader_read_string(&r, ' ') or_return
-    x := strconv.atoi(x_s)
-    delete(x_s)
-    y_s := bufio.reader_read_string(&r, ' ') or_return
-    y := strconv.atoi(y_s)
-    delete(y_s)
+    x := read_value(&r, ' ') or_return
+    y := read_value(&r, ' ') or_return
     g.board.magic_tiles2[{x, y}] = {}
   }
+  if auto_clear do free_all(context.temp_allocator)
   return nil
 }
-//std::istream &operator>>(std::istream &in, Board &b) {
-//  in >> b.score >> b.normals >> b.longers >> b.longests >> b.crosses >> b.w >>
-//      b.h
-//  b.board.resize(b.w * b.h)
-//  for (int i = 0; i < b.w; ++i) {
-//    for (int j = 0; j < b.h; ++j) {
-//      in >> b.at(i, j)
-//    }
-//  }
-//  int s
-//  in >> s
-//  b.magic_tiles.clear()
-//  int i, j
-//  for (int k = 0; k < s; ++k) {
-//    in >> i >> j
-//    b.magic_tiles.insert({i, j})
-//  }
-//  in >> s
-//  for (int k = 0; k < s; ++k) {
-//    in >> i >> j
-//    b.magic_tiles2.insert({i, j})
-//  }
-//  return in
-//}
-//
-load :: proc(g: ^Game) -> bool {
+load :: proc(g: ^Game, auto_clear: bool = false) -> bool {
   handle, err := os.open("save.txt")
   if err == 0 {
     g.work_board = false
-    err := load_game(g, handle)
-    if err != nil {
-      return false
-    }
+    err := load_game(g, handle, auto_clear)
+    if err != nil do return false
     match(g)
     return true
   }
@@ -997,9 +908,7 @@ attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
 }
 step_game :: proc(g: ^Game) -> [dynamic]Triple {
   res: [dynamic]Triple
-  if !has_removals(g.board) {
-    prepare_removals(&g.board)
-  }
+  if !has_removals(g.board) do prepare_removals(&g.board)
   if !has_removals(g.board) {
     if g.first_work {
       restore_state(g)
@@ -1048,9 +957,7 @@ Explosion :: struct {
   lifetime: int,
 }
 button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
-  if in_button(pos, button) {
-    flag^ = !flag^
-  }
+  if in_button(pos, button) do flag^ = !flag^
 }
 main :: proc() {
   when ODIN_DEBUG {
@@ -1100,7 +1007,7 @@ main :: proc() {
   rl.InitAudioDevice()
   psound := rl.LoadSound("p.ogg")
   ksound := rl.LoadSound("k.ogg")
-  if !load(&game) {
+  if !load(&game, true) {
     new_game(&game)
     input_name = true
   }
@@ -1120,12 +1027,7 @@ main :: proc() {
     }
     w = rl.GetRenderWidth()
     h = rl.GetRenderHeight()
-    s: i32 = 0
-    if w > h {
-      s = h
-    } else {
-      s = w
-    }
+    s: i32 = w > h ? h : w
     margin: i32 = 10
     board_x := w / 2 - s / 2 + margin
     board_y := h / 2 - s / 2 + margin
@@ -1135,9 +1037,7 @@ main :: proc() {
     if is_processing(game) && frame_counter % 6 == 0 {
       f := step_game(&game)
       defer delete(f)
-      if is_play_sound && !(len(f) == 0) && rl.IsSoundReady(psound) {
-        rl.PlaySound(psound)
-      }
+      if is_play_sound && !(len(f) == 0) && rl.IsSoundReady(psound) do rl.PlaySound(psound)
       if particles {
         if is_play_sound && !(len(f) == 0) {
           board_x += i32(dd())
@@ -1229,12 +1129,8 @@ main :: proc() {
             rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.BEIGE : rl.YELLOW)
           }
         }
-        if is_magic(game.board, j, i) {
-          rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
-        }
-        if is_magic2(game.board, j, i) {
-          rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
-        }
+        if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
+        if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
       }
     }
     if !first_click {
@@ -1288,9 +1184,7 @@ main :: proc() {
     }
     if input_name {
       c := rl.GetCharPressed()
-      if unicode.is_alpha(c) || unicode.is_number(c) || c == '_' && len(game.name) < 22 && !ignore_r {
-        strings.write_rune(&builder, c)
-      }
+      if unicode.is_alpha(c) || unicode.is_number(c) || c == '_' && len(game.name) < 22 && !ignore_r do strings.write_rune(&builder, c)
       ignore_r = false
       rl.DrawRectangle(w / 4, h / 2 - h / 16, w / 2, h / 8, rl.WHITE)
       rl.DrawText("Enter your name:", w / 4, h / 2 - h / 16, 50, rl.BLACK)
@@ -1301,17 +1195,11 @@ main :: proc() {
       kd := rl.IsKeyPressed(rl.KeyboardKey.DOWN)
       ku := rl.IsKeyPressed(rl.KeyboardKey.UP)
       if wheel_move == 0 {
-        if kd {
-          wheel_move = -1
-        }
-        if ku {
-          wheel_move = 1
-        }
+        if kd do wheel_move = -1
+        if ku do wheel_move = 1
       }
       if wheel_move != 0 {
-        if l_offset != 0 || wheel_move <= 0 {
-          l_offset = l_offset - (wheel_move < 0 ? -1 : 1)
-        }
+        if l_offset != 0 || wheel_move <= 0 do l_offset = l_offset - (wheel_move < 0 ? -1 : 1)
         l_offset = min(l_offset, len(leaderboard) - 1)
       }
       DrawLeaderboard(&leaderboard, l_offset, leaderboard_place)
@@ -1342,9 +1230,7 @@ main :: proc() {
     save_button := draw_button(&bm, {w - 210, h - start_y}, "SAVE", false)
     play_sound(bm)
     volume = bm.volume
-    if volume < 0.05 {
-      volume = 0
-    }
+    if volume < 0.05 do volume = 0
     is_play_sound = volume != 0
     if particles {
       new_staying := make([dynamic]Explosion)
@@ -1352,9 +1238,7 @@ main :: proc() {
       for it in staying {
         p := it
         rl.DrawRectangle(board_x + i32(p.x) * ss + so, board_y + i32(p.y) * ss + so, ss - 2 * so, ss - 2 * so, rl.WHITE)
-        if p.lifetime > 6 {
-          continue
-        }
+        if p.lifetime > 6 do continue
         p.lifetime += 1
         append(&new_staying, p)
       }
@@ -1374,9 +1258,7 @@ main :: proc() {
           rl.DrawPoly({f32(p.x), f32(p.y)}, i32(p.sides), f32(ss / 2), p.a, c)
         }
         p.y += p.dy
-        if p.y > f32(h) || p.x < 0 || p.x > f32(w) || p.lifetime > 254 {
-          continue
-        }
+        if p.y > f32(h) || p.x < 0 || p.x > f32(w) || p.lifetime > 254 do continue
         p.x += p.dx
         p.a += p.da
         p.dy += 1
@@ -1400,19 +1282,11 @@ main :: proc() {
             new_game(&game)
             input_name = true
           }
-          if in_button(pos, load_button) {
-            load(&game)
-          }
-          if in_button(pos, save_button) {
-            save(game)
-          }
-          if draw_leaderboard {
-            break outside
-          }
+          if in_button(pos, load_button) do load(&game)
+          if in_button(pos, save_button) do save(game)
+          if draw_leaderboard do break outside
           pos = pos - {f32(board_x), f32(board_y)}
-          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) {
-            break outside
-          }
+          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
           row := i32(pos.y / f32(ss))
           col := i32(pos.x / f32(ss))
           if first_click {
@@ -1421,24 +1295,18 @@ main :: proc() {
             first_click = false
           } else {
             first_click = true
-            if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) {
-              attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
-            }
+            if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
           }
         } else if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
           pos := rl.GetMousePosition()
           pos = pos - {f32(board_x), f32(board_y)}
-          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) {
-            break outside
-          }
+          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
           row := i32(pos.y / f32(ss))
           col := i32(pos.x / f32(ss))
           if row != saved_row || col != saved_col {
             if !first_click {
               first_click = true
-              if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) {
-                attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
-              }
+              if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
             }
           }
         }
@@ -1447,17 +1315,13 @@ main :: proc() {
     if rl.IsKeyPressed(.ENTER) && input_name {
       input_name = false
       game.name = strings.to_string(builder)
-      if len(game.name) == 0 {
-        game.name = "dupa"
-      }
+      if len(game.name) == 0 do game.name = "dupa"
     } else if rl.IsKeyPressed(.BACKSPACE) {
       strings.pop_rune(&builder)
     } else if !input_name {
       for {
         key := rl.GetKeyPressed()
-        if key == .KEY_NULL {
-          break
-        }
+        if key == .KEY_NULL do break
         #partial switch key {
         case .R:
           {
@@ -1469,9 +1333,7 @@ main :: proc() {
         case .L:
           {
             draw_leaderboard = !draw_leaderboard
-            if !draw_leaderboard {
-              leaderboard_place = -1
-            }
+            if !draw_leaderboard do leaderboard_place = -1
           }
         case .P:
           {
