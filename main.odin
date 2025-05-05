@@ -22,8 +22,7 @@ SizedPattern :: struct {
   h:   int,
 }
 shift :: proc(p: Pattern) -> Pattern {
-  minX := max(int)
-  minY := max(int)
+  minX, minY := max(int), max(int)
   for pt in p {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
@@ -62,8 +61,7 @@ sized :: proc(p: Pattern) -> SizedPattern {
   res: SizedPattern
   res.pat = make(Pattern, len(p))
   copy(res.pat[:], p[:])
-  maxX := min(int)
-  maxY := min(int)
+  maxX, maxY := min(int), min(int)
   for pt in p {
     maxX = max(pt.x, maxX)
     maxY = max(pt.y, maxY)
@@ -92,9 +90,7 @@ threes_f :: proc() -> [dynamic]SizedPattern {
   three_p_1: Pattern = {{0, 0}, {1, 1}, {0, 2}}
   three_p_2: Pattern = {{1, 0}, {0, 1}, {0, 2}}
   three_p_3: Pattern = {{0, 0}, {0, 1}, {0, 3}}
-  threes1 := generate(three_p_1)
-  threes2 := generate(three_p_2)
-  threes3 := generate(three_p_3)
+  threes1, threes2, threes3 := generate(three_p_1), generate(three_p_2), generate(three_p_3)
   res := make([dynamic]SizedPattern, len(threes1) + len(threes2) + len(threes3))
   copy(res[:], threes1[:])
   copy(res[len(threes1):], threes2[:])
@@ -105,9 +101,7 @@ patterns_f :: proc() -> [dynamic]SizedPattern {
   four_p: Pattern = {{0, 0}, {1, 1}, {0, 2}, {0, 3}}
   five_p_1: Pattern = {{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
   five_p_2: Pattern = {{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
-  fours := generate(four_p)
-  fives1 := generate(five_p_1)
-  fives2 := generate(five_p_2)
+  fours, fives1, fives2 := generate(four_p), generate(five_p_1), generate(five_p_2)
   res := make([dynamic]SizedPattern, len(fours) + len(fives1) + len(fives2))
   copy(res[:], fours[:])
   copy(res[len(fours):], fives1[:])
@@ -267,8 +261,7 @@ remove_trios :: proc(b: ^Board) {
   defer delete(remove_j)
   for i := 0; i < b.w; i += 1 {
     for j := 0; j < b.h; j += 1 {
-      offset_i := 1
-      offset_j := 1
+      offset_i, offset_j := 1, 1
       for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) {
         offset_j += 1
       }
@@ -310,8 +303,7 @@ remove_trios :: proc(b: ^Board) {
     }
   }
   for t in remove_j {
-    i, j := t.first, t.second
-    offset := t.third
+    i, j, offset := t.first, t.second, t.third
     b.normals += 1
     if offset == 4 {
       i = 0
@@ -445,8 +437,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   res := make([dynamic]Triple)
   if len(b.rm_i) != 0 {
     t := b.rm_i[len(b.rm_i) - 1]
-    i, j := t.first, t.second
-    offset := t.third
+    i, j, offset := t.first, t.second, t.third
     if offset == 4 {
       j = 0
       offset = b.h
@@ -490,8 +481,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   }
   if len(b.rm_j) != 0 {
     t := b.rm_j[len(b.rm_j) - 1]
-    i, j := t.first, t.second
-    offset := t.third
+    i, j, offset := t.first, t.second, t.third
     if offset == 4 {
       i = 0
       offset = b.w
@@ -560,8 +550,7 @@ prepare_removals :: proc(b: ^Board) {
   clear(&b.matched_threes)
   for i := 0; i < b.w; i += 1 {
     for j := 0; j < b.h; j += 1 {
-      offset_j := 1
-      offset_i := 1
+      offset_j, offset_i := 1, 1
       for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) {
         offset_j += 1
       }
@@ -636,8 +625,7 @@ WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
   os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
 }
 DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
-  w := rl.GetRenderWidth()
-  h := rl.GetRenderHeight()
+  w, h := rl.GetRenderWidth(), rl.GetRenderHeight()
   start_y := h / 4 + 10
   rl.DrawRectangle(w / 4, h / 4, w / 2, h / 2, rl.WHITE)
   rl.DrawText("Leaderboard:", w / 4 + 10, start_y, 20, rl.BLACK)
@@ -1032,8 +1020,7 @@ main :: proc() {
     rl.DrawRectangle(board_x, board_y, ss * i32(board_size), ss * i32(board_size), rl.BLACK)
     for i := 0; i < board_size; i += 1 {
       for j := 0; j < board_size; j += 1 {
-        pos_x := board_x + i32(i) * ss + so
-        pos_y := board_y + i32(j) * ss + so
+        pos_x, pos_y := board_x + i32(i) * ss + so, board_y + i32(j) * ss + so
         radius := (ss - 2 * so) / 2
         if is_matched(game.board, j, i) && hints {
           rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.DARKGRAY)
@@ -1061,16 +1048,12 @@ main :: proc() {
       }
     }
     if !first_click {
-      pos := rl.GetMousePosition()
-      pos -= {f32(board_x), f32(board_y)}
+      pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
       if !(pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size))) {
-        row := i32(pos.y / f32(ss))
-        col := i32(pos.x / f32(ss))
-        dx := col - saved_col
-        dy := row - saved_row
+        row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
+        dx, dy := col - saved_col, row - saved_row
         radius := (ss - 2 * so) / 2
-        pos_x := board_x + saved_col * ss + so
-        pos_y := board_y + saved_row * ss + so
+        pos_x, pos_y := board_x + saved_col * ss + so, board_y + saved_row * ss + so
         if dx == 1 && dy == 0 || dx == 0 && dy == 1 {
           (dx == 1 ? rl.DrawRectangleGradientH : rl.DrawRectangleGradientV)(
             pos_x + radius - 10,
@@ -1219,8 +1202,7 @@ main :: proc() {
           if draw_leaderboard do break outside
           pos = pos - {f32(board_x), f32(board_y)}
           if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
-          row := i32(pos.y / f32(ss))
-          col := i32(pos.x / f32(ss))
+          row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
           if first_click {
             saved_row = row
             saved_col = col
@@ -1230,11 +1212,9 @@ main :: proc() {
             if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
           }
         } else if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
-          pos := rl.GetMousePosition()
-          pos = pos - {f32(board_x), f32(board_y)}
+          pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
           if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
-          row := i32(pos.y / f32(ss))
-          col := i32(pos.x / f32(ss))
+          row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
           if row != saved_row || col != saved_col {
             if !first_click {
               first_click = true
