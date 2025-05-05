@@ -668,17 +668,11 @@ DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
     c := rl.BLACK
     switch i {
     case 0:
-      {
-        c = rl.GOLD
-      }
+      c = rl.GOLD
     case 1:
-      {
-        c = rl.GRAY
-      }
+      c = rl.GRAY
     case 2:
-      {
-        c = rl.ORANGE
-      }
+      c = rl.ORANGE
     }
     if place == i {
       width := rl.MeasureText(text, 20)
@@ -1024,35 +1018,23 @@ main :: proc() {
           s: int
           switch it.third {
           case 1:
-            {
-              c = nonacid_colors ? rl.PINK : rl.RED
-              s = 4
-            }
+            c = nonacid_colors ? rl.PINK : rl.RED
+            s = 4
           case 2:
-            {
-              c = nonacid_colors ? rl.LIME : rl.GREEN
-              s = 0
-            }
+            c = nonacid_colors ? rl.LIME : rl.GREEN
+            s = 0
           case 3:
-            {
-              c = nonacid_colors ? rl.SKYBLUE : rl.BLUE
-              s = 6
-            }
+            c = nonacid_colors ? rl.SKYBLUE : rl.BLUE
+            s = 6
           case 4:
-            {
-              c = nonacid_colors ? rl.GOLD : rl.ORANGE
-              s = 3
-            }
+            c = nonacid_colors ? rl.GOLD : rl.ORANGE
+            s = 3
           case 5:
-            {
-              c = nonacid_colors ? rl.PURPLE : rl.MAGENTA
-              s = 5
-            }
+            c = nonacid_colors ? rl.PURPLE : rl.MAGENTA
+            s = 5
           case 6:
-            {
-              c = nonacid_colors ? rl.BEIGE : rl.YELLOW
-              s = 4
-            }
+            c = nonacid_colors ? rl.BEIGE : rl.YELLOW
+            s = 4
           }
           append(
             &flying,
@@ -1079,29 +1061,17 @@ main :: proc() {
         }
         switch at(game.board, j, i) {
         case 1:
-          {
-            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
-          }
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
         case 2:
-          {
-            rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
-          }
+          rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
         case 3:
-          {
-            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
-          }
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
         case 4:
-          {
-            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 3, f32(radius) - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
-          }
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 3, f32(radius) - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
         case 5:
-          {
-            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
-          }
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
         case 6:
-          {
-            rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.BEIGE : rl.YELLOW)
-          }
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.BEIGE : rl.YELLOW)
         }
         if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
         if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
@@ -1298,41 +1268,25 @@ main :: proc() {
         if key == .KEY_NULL do break
         #partial switch key {
         case .R:
-          {
-            new_game(&game)
-            ignore_r = true
-            input_name = true
-            strings.builder_reset(&builder)
-          }
+          new_game(&game)
+          ignore_r = true
+          input_name = true
+          strings.builder_reset(&builder)
         case .L:
-          {
-            draw_leaderboard = !draw_leaderboard
-            if !draw_leaderboard do leaderboard_place = -1
-          }
+          draw_leaderboard = !draw_leaderboard
+          if !draw_leaderboard do leaderboard_place = -1
         case .P:
-          {
-            particles = !particles
-          }
+          particles = !particles
         case .M:
-          {
-            is_play_sound = !is_play_sound
-          }
+          is_play_sound = !is_play_sound
         case .H:
-          {
-            hints = !hints
-          }
+          hints = !hints
         case .A:
-          {
-            nonacid_colors = !nonacid_colors
-          }
+          nonacid_colors = !nonacid_colors
         case .S:
-          {
-            save(game)
-          }
+          save(game)
         case .O:
-          {
-            load(&game)
-          }
+          load(&game)
         }
       }
     }
