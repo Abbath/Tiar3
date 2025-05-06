@@ -573,6 +573,7 @@ ReadLeaderboard :: proc() -> (Leaderboard, bool) {
   if ok {
     lines := strings.split_lines(string(data))
     defer delete(lines)
+    m: u64 = 0
     for line in lines {
       parts, err := strings.split(line, ";")
       defer if err == .None do delete(parts)
@@ -581,7 +582,11 @@ ReadLeaderboard :: proc() -> (Leaderboard, bool) {
         lr.name = strings.clone(parts[0])
         lr.score = strconv.atoi(parts[1])
         h, ok := strconv.parse_u64(parts[2])
-        if !ok || !check_hash(lr, h) do return nil, false
+        if !ok || !check_hash(lr, h + m) {
+          delete(res)
+          return nil, false
+        }
+        m = h
         append(&res, lr)
       }
     }
@@ -595,10 +600,8 @@ WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
   slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
   m: u64 = 0
   for lr in leaderboard {
-    m := compute_hash(lr, m)
-    str := fmt.aprintf("%s;%d;%d", lr.name, lr.score, m, newline = true)
-    defer delete(str)
-    strings.write_string(&builder, str)
+    m = compute_hash(lr, m)
+    fmt.sbprintf(&builder, "%s;%d;%d", lr.name, lr.score, m, newline = true)
   }
   os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
 }
@@ -943,7 +946,7 @@ main :: proc() {
   leaderboard_place := -1
   leaderboard, ok := ReadLeaderboard()
   if !ok {
-    fmt.println("Leaderboard compromised")
+    fmt.println("Leaderboard is compromised")
     leaderboard = Leaderboard{}
   }
   flying := make([dynamic]Particle)
@@ -1232,8 +1235,11 @@ main :: proc() {
     if rl.IsKeyPressed(.ENTER) && input_name {
       input_name = false
       delete(game.name)
-      game.name = strings.to_string(builder)
-      if len(game.name) == 0 do game.name = strings.clone("dupa")
+      if len(strings.to_string(builder)) == 0 {
+        game.name = strings.clone("dupa")
+      } else {
+        game.name = strings.clone(strings.to_string(builder))
+      }
     } else if rl.IsKeyPressed(.BACKSPACE) {
       strings.pop_rune(&builder)
     } else if !input_name {
