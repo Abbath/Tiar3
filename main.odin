@@ -19,47 +19,50 @@ import rl "vendor:raylib"
 
 Point :: distinct [2]int
 Pattern :: distinct [dynamic]Point
-SizedPattern :: struct {
-  pat: Pattern,
-  w:   int,
-  h:   int,
+Pat :: struct($N: int) {
+  pat: [N]Point,
 }
-shift :: proc(p: ^Pattern) {
+SPat :: struct($N: int) {
+  using pattern: Pat(N),
+  w:             int,
+  h:             int,
+}
+Threes :: distinct [24]SPat(3)
+Fours :: distinct [8]SPat(4)
+Fives :: distinct [16]SPat(5)
+shift_p :: proc(p: ^Pat($N)) {
   minX, minY := max(int), max(int)
-  for pt in p {
+  for pt in p.pat {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
   }
-  for &pt in p do pt -= {minX, minY}
+  for &pt in p.pat do pt -= {minX, minY}
 }
-rotations :: proc(p: Pattern) -> [4]Pattern {
-  res: [4]Pattern
-  res[0] = make(Pattern, len(p))
-  copy(res[0][:], p[:])
+rotations_p :: proc(p: Pat($N)) -> [4]Pat(N) {
+  res: [4]Pat(N)
+  res[0] = p
   for i in 1 ..< 4 {
-    rotated := make(Pattern, len(p))
-    for j in 0 ..< len(p) {
-      rotated[j].x = res[i - 1][j].y
-      rotated[j].y = -res[i - 1][j].x
+    rotated: Pat(N)
+    for j in 0 ..< N {
+      rotated.pat[j].x = res[i - 1].pat[j].y
+      rotated.pat[j].y = -res[i - 1].pat[j].x
     }
-    shift(&rotated)
+    shift_p(&rotated)
     res[i] = rotated
   }
   return res
 }
-mirrored :: proc(p: Pattern) -> Pattern {
-  m := make(Pattern, len(p))
-  copy(m[:], p[:])
-  for i in 0 ..< len(p) do m[i].y = -p[i].y
-  shift(&m)
+mirrored_p :: proc(p: Pat($N)) -> Pat(N) {
+  m: Pat(N) = p
+  for i in 0 ..< N do m.pat[i].y = -p.pat[i].y
+  shift_p(&m)
   return m
 }
-sized :: proc(p: Pattern) -> SizedPattern {
-  res: SizedPattern
-  res.pat = make(Pattern, len(p))
-  copy(res.pat[:], p[:])
+sized_p :: proc(p: Pat($N)) -> SPat(N) {
+  res: SPat(N)
+  res.pat = p.pat
   maxX, maxY := min(int), min(int)
-  for pt in p {
+  for pt in p.pat {
     maxX = max(pt.x, maxX)
     maxY = max(pt.y, maxY)
   }
@@ -67,59 +70,39 @@ sized :: proc(p: Pattern) -> SizedPattern {
   res.h = int(maxY + 1)
   return res
 }
-generate :: proc(p: Pattern) -> [dynamic]SizedPattern {
-  s := rotations(p)
-  defer for sp in s do delete(sp)
-  res1 := make([dynamic]Pattern)
-  defer delete(res1)
-  m := mirrored(p)
-  defer delete(m)
-  r := rotations(m)
-  defer for re in r do delete(re)
-  resize(&res1, len(s) + len(r))
+generate_p :: proc(p: Pat($N)) -> [8]SPat(N) {
+  s := rotations_p(p)
+  m := mirrored_p(p)
+  r := rotations_p(m)
+  res1: [8]Pat(N)
   copy(res1[:], r[:])
-  copy(res1[len(r):], s[:])
-  res2 := make([dynamic]SizedPattern)
-  reserve(&res2, len(res1))
-  for pt in res1 do append(&res2, sized(pt))
+  copy(res1[4:], s[:])
+  res2: [8]SPat(N)
+  for i in 0 ..< 8 do res2[i] = sized_p(res1[i])
   return res2
 }
-threes_f :: proc() -> [dynamic]SizedPattern {
-  three_p_1: Pattern = {{0, 0}, {1, 1}, {0, 2}}
-  defer delete(three_p_1)
-  three_p_2: Pattern = {{1, 0}, {0, 1}, {0, 2}}
-  defer delete(three_p_2)
-  three_p_3: Pattern = {{0, 0}, {0, 1}, {0, 3}}
-  defer delete(three_p_3)
-  threes1, threes2, threes3 := generate(three_p_1), generate(three_p_2), generate(three_p_3)
-  defer {
-    delete(threes1)
-    delete(threes2)
-    delete(threes3)
-  }
-  res := make([dynamic]SizedPattern, len(threes1) + len(threes2) + len(threes3))
+threes_p :: proc() -> [24]SPat(3) {
+  three_p_1: Pat(3) = {{{0, 0}, {1, 1}, {0, 2}}}
+  three_p_2: Pat(3) = {{{1, 0}, {0, 1}, {0, 2}}}
+  three_p_3: Pat(3) = {{{0, 0}, {0, 1}, {0, 3}}}
+  threes1, threes2, threes3 := generate_p(three_p_1), generate_p(three_p_2), generate_p(three_p_3)
+  res: [24]SPat(3)
   copy(res[:], threes1[:])
-  copy(res[len(threes1):], threes2[:])
-  copy(res[len(threes1) + len(threes2):], threes3[:])
+  copy(res[8:], threes2[:])
+  copy(res[16:], threes3[:])
   return res
 }
-patterns_f :: proc() -> [dynamic]SizedPattern {
-  four_p: Pattern = {{0, 0}, {1, 1}, {0, 2}, {0, 3}}
-  defer delete(four_p)
-  five_p_1: Pattern = {{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
-  defer delete(five_p_1)
-  five_p_2: Pattern = {{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
-  defer delete(five_p_2)
-  fours, fives1, fives2 := generate(four_p), generate(five_p_1), generate(five_p_2)
-  defer {
-    delete(fours)
-    delete(fives1)
-    delete(fives2)
-  }
-  res := make([dynamic]SizedPattern, len(fours) + len(fives1) + len(fives2))
-  copy(res[:], fours[:])
-  copy(res[len(fours):], fives1[:])
-  copy(res[len(fours) + len(fives1):], fives2[:])
+fours_p :: proc() -> [8]SPat(4) {
+  four_p: Pat(4) = {{{0, 0}, {1, 1}, {0, 2}, {0, 3}}}
+  return generate_p(four_p)
+}
+fives_p :: proc() -> [16]SPat(5) {
+  five_p_1: Pat(5) = {{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}
+  five_p_2: Pat(5) = {{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}}
+  fives1, fives2 := generate_p(five_p_1), generate_p(five_p_2)
+  res: [16]SPat(5)
+  copy(res[:], fives1[:])
+  copy(res[8:], fives2[:])
   return res
 }
 Pair :: struct {
@@ -207,14 +190,16 @@ at :: proc(brd: Board, a, b: int) -> int {
 set_at :: proc(brd: ^Board, a, b, v: int) {
   brd.board[a * brd.h + b] = v
 }
-match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
+match_pattern :: proc(b: Board, x, y: int, p: SPat($N)) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
   for i in 1 ..< len(p.pat) do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   return true
 }
-match_patterns :: proc(b: ^Board, patterns: [dynamic]SizedPattern) {
-  clear(&b.matched_patterns)
-  for sp in patterns do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
+match_fours :: proc(b: ^Board, fours: Fours) {
+  for sp in fours do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
+}
+match_fives :: proc(b: ^Board, fives: Fives) {
+  for sp in fives do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
 }
 is_matched :: proc(b: Board, x, y: int) -> bool {
   return {x, y} in b.matched_patterns
@@ -381,14 +366,14 @@ compare_boards :: proc(b1: Board, b2: Board) -> bool {
   for i in 0 ..< b1.w * b1.h do if b1.board[i] != b2.board[i] do return false
   return true
 }
-match_threes :: proc(b: ^Board, threes: [dynamic]SizedPattern) {
+match_threes :: proc(b: ^Board, threes: Threes) {
   clear(&b.matched_threes)
   for sp in threes do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_threes[{i + p.x, j + p.y}] = {}
 }
 is_three :: proc(b: Board, i, j: int) -> bool {
   return {i, j} in b.matched_threes
 }
-stabilize :: proc(b: ^Board, patterns: [dynamic]SizedPattern, threes: [dynamic]SizedPattern) {
+stabilize :: proc(b: ^Board, threes: Threes, fours: Fours, fives: Fives) {
   for {
     old_board := copy_board(b^)
     defer delete_board(&old_board)
@@ -396,13 +381,17 @@ stabilize :: proc(b: ^Board, patterns: [dynamic]SizedPattern, threes: [dynamic]S
     fill_up(b)
     if compare_boards(old_board, b^) do break
   }
-  match_patterns(b, patterns)
+  clear(&b.matched_patterns)
+  match_fours(b, fours)
+  match_fives(b, fives)
   match_threes(b, threes)
 }
-step :: proc(b: ^Board, patterns: [dynamic]SizedPattern, threes: [dynamic]SizedPattern) {
+step :: proc(b: ^Board, threes: Threes, fours: Fours, fives: Fives) {
   remove_trios(b)
   fill_up(b)
-  match_patterns(b, patterns)
+  clear(&b.matched_patterns)
+  match_fours(b, fours)
+  match_fives(b, fives)
   match_threes(b, threes)
 }
 zero :: proc(b: ^Board) {
@@ -710,8 +699,9 @@ Game :: struct {
   first_work:    bool,
   removed_cells: [dynamic]Triple,
   counter:       int,
-  patterns:      [dynamic]SizedPattern,
-  threes:        [dynamic]SizedPattern,
+  threes:        Threes,
+  fours:         Fours,
+  fives:         Fives,
 }
 make_game :: proc(size: int) -> Game {
   board := make_board(size, size)
@@ -726,7 +716,7 @@ new_game :: proc(g: ^Game) {
   g.counter = 0
   g.work_board = false
   fill(&g.board)
-  stabilize(&g.board, g.patterns, g.threes)
+  stabilize(&g.board, g.threes, g.fours, g.fives)
   zero(&g.board)
 }
 save :: proc(g: Game, auto_clean: bool = false) {
@@ -813,7 +803,8 @@ restore_state :: proc(g: ^Game) {
   g.board = copy_board(g.old_board)
 }
 match :: proc(g: ^Game) {
-  match_patterns(&g.board, g.patterns)
+  match_fours(&g.board, g.fours)
+  match_fives(&g.board, g.fives)
   match_threes(&g.board, g.threes)
 }
 attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
@@ -913,22 +904,16 @@ main :: proc() {
   opts.steps = opts.steps == 0 ? 50 : opts.steps
   rand.reset(u64(time.time_to_unix(time.now())))
   dd :: proc() -> int {return rand.int_max(21) - 10}
-  patterns := patterns_f()
-  defer {
-    for p in patterns do delete(p.pat)
-    delete(patterns)
-  }
-  threes := threes_f()
-  defer {
-    for t in threes do delete(t.pat)
-    delete(threes)
-  }
+  threes := threes_p()
+  fours := fours_p()
+  fives := fives_p()
   w: i32 = 1280
   h: i32 = 800
   board_size := 16
   game := make_game(board_size)
-  game.patterns = patterns
-  game.threes = threes
+  game.fours = Fours(fours)
+  game.threes = Threes(threes)
+  game.fives = Fives(fives)
   defer delete_game(&game)
   first_click := true
   saved_row: i32 = 0
