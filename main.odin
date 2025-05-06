@@ -24,18 +24,15 @@ SizedPattern :: struct {
   w:   int,
   h:   int,
 }
-shift :: proc(p: Pattern) -> Pattern {
+shift :: proc(p: ^Pattern) {
   minX, minY := max(int), max(int)
   for pt in p {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
   }
-  res := make(Pattern, len(p))
-  copy(res[:], p[:])
-  for &pt in res {
+  for &pt in p {
     pt -= {minX, minY}
   }
-  return res
 }
 rotations :: proc(p: Pattern) -> [4]Pattern {
   res: [4]Pattern
@@ -43,12 +40,12 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
   copy(res[0][:], p[:])
   for i := 1; i < 4; i += 1 {
     rotated := make(Pattern, len(p))
-    defer delete(rotated)
     for j := 0; j < len(p); j += 1 {
       rotated[j].x = res[i - 1][j].y
       rotated[j].y = -res[i - 1][j].x
     }
-    res[i] = shift(rotated)
+    shift(&rotated)
+    res[i] = rotated
   }
   return res
 }
@@ -58,7 +55,8 @@ mirrored :: proc(p: Pattern) -> Pattern {
   for i := 0; i < len(p); i += 1 {
     m[i].y = -p[i].y
   }
-  return shift(m)
+  shift(&m)
+  return m
 }
 sized :: proc(p: Pattern) -> SizedPattern {
   res: SizedPattern
@@ -75,9 +73,17 @@ sized :: proc(p: Pattern) -> SizedPattern {
 }
 generate :: proc(p: Pattern) -> [dynamic]SizedPattern {
   s := rotations(p)
+  defer for sp in s {
+    delete(sp)
+  }
   res1 := make([dynamic]Pattern)
+  defer delete(res1)
   m := mirrored(p)
+  defer delete(m)
   r := rotations(m)
+  defer for re in r {
+    delete(re)
+  }
   resize(&res1, len(s) + len(r))
   copy(res1[:], r[:])
   copy(res1[len(r):], s[:])
@@ -86,14 +92,21 @@ generate :: proc(p: Pattern) -> [dynamic]SizedPattern {
   for pt in res1 {
     append(&res2, sized(pt))
   }
-  delete(res1)
   return res2
 }
 threes_f :: proc() -> [dynamic]SizedPattern {
   three_p_1: Pattern = {{0, 0}, {1, 1}, {0, 2}}
+  defer delete(three_p_1)
   three_p_2: Pattern = {{1, 0}, {0, 1}, {0, 2}}
+  defer delete(three_p_2)
   three_p_3: Pattern = {{0, 0}, {0, 1}, {0, 3}}
+  defer delete(three_p_3)
   threes1, threes2, threes3 := generate(three_p_1), generate(three_p_2), generate(three_p_3)
+  defer {
+    delete(threes1)
+    delete(threes2)
+    delete(threes3)
+  }
   res := make([dynamic]SizedPattern, len(threes1) + len(threes2) + len(threes3))
   copy(res[:], threes1[:])
   copy(res[len(threes1):], threes2[:])
@@ -102,9 +115,17 @@ threes_f :: proc() -> [dynamic]SizedPattern {
 }
 patterns_f :: proc() -> [dynamic]SizedPattern {
   four_p: Pattern = {{0, 0}, {1, 1}, {0, 2}, {0, 3}}
+  defer delete(four_p)
   five_p_1: Pattern = {{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}
+  defer delete(five_p_1)
   five_p_2: Pattern = {{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}
+  defer delete(five_p_2)
   fours, fives1, fives2 := generate(four_p), generate(five_p_1), generate(five_p_2)
+  defer {
+    delete(fours)
+    delete(fives1)
+    delete(fives2)
+  }
   res := make([dynamic]SizedPattern, len(fours) + len(fives1) + len(fives2))
   copy(res[:], fours[:])
   copy(res[len(fours):], fives1[:])
@@ -746,6 +767,7 @@ make_game :: proc(size: int) -> Game {
   return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple), name = ""}
 }
 delete_game :: proc(g: ^Game) {
+  delete(g.name)
   delete_board(&g.board)
   delete_board(&g.old_board)
 }
@@ -951,9 +973,19 @@ main :: proc() {
   rand.reset(u64(time.time_to_unix(time.now())))
   dd :: proc() -> int {return rand.int_max(21) - 10}
   patterns := patterns_f()
-  defer delete(patterns)
+  defer {
+    for p in patterns {
+      delete(p.pat)
+    }
+    delete(patterns)
+  }
   threes := threes_f()
-  defer delete(threes)
+  defer {
+    for t in threes {
+      delete(t.pat)
+    }
+    delete(threes)
+  }
   w: i32 = 1280
   h: i32 = 800
   board_size := 16
@@ -1265,8 +1297,9 @@ main :: proc() {
     }
     if rl.IsKeyPressed(.ENTER) && input_name {
       input_name = false
+      delete(game.name)
       game.name = strings.to_string(builder)
-      if len(game.name) == 0 do game.name = "dupa"
+      if len(game.name) == 0 do game.name = strings.clone("dupa")
     } else if rl.IsKeyPressed(.BACKSPACE) {
       strings.pop_rune(&builder)
     } else if !input_name {
@@ -1300,7 +1333,7 @@ main :: proc() {
     if is_finished(game, opts.steps) {
       for lr, idx in leaderboard {
         if lr.score < game.board.score {
-          inject_at(&leaderboard, idx, LeaderboardRecord{game.name, game.board.score})
+          inject_at(&leaderboard, idx, LeaderboardRecord{strings.clone(game.name), game.board.score})
           leaderboard_place = idx
           l_offset = max(0, idx - 4)
           break
@@ -1308,7 +1341,7 @@ main :: proc() {
       }
       if leaderboard_place == -1 {
         leaderboard_place = len(leaderboard)
-        append(&leaderboard, LeaderboardRecord{game.name, game.board.score})
+        append(&leaderboard, LeaderboardRecord{strings.clone(game.name), game.board.score})
         l_offset = max(0, leaderboard_place - 4)
       }
       WriteLeaderboard(&leaderboard)
