@@ -3,6 +3,7 @@ package main
 
 import "core:bufio"
 import "core:fmt"
+import "core:hash"
 import "core:io"
 import "core:math"
 import "core:math/rand"
@@ -11,6 +12,7 @@ import "core:os"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import "core:time"
 import "core:unicode"
 import rl "vendor:raylib"
 
@@ -592,7 +594,7 @@ delete_leaderboard :: proc(l: ^Leaderboard) {
     delete(lr.name)
   }
 }
-ReadLeaderboard :: proc() -> Leaderboard {
+ReadLeaderboard :: proc() -> (Leaderboard, bool) {
   res := make(Leaderboard)
   data, ok := os.read_entire_file("leaderboard.txt")
   defer if ok do delete(data)
@@ -602,29 +604,36 @@ ReadLeaderboard :: proc() -> Leaderboard {
     for line in lines {
       parts, err := strings.split(line, ";")
       defer if err == .None do delete(parts)
-      if len(parts) == 2 {
+      if len(parts) == 3 {
         lr: LeaderboardRecord
         lr.name = strings.clone(parts[0])
         lr.score = strconv.atoi(parts[1])
+        h, ok := strconv.parse_u64(parts[2])
+        if !ok || !check_hash(lr, h) {
+          return nil, false
+        }
         append(&res, lr)
       }
     }
   }
   slice.sort_by(res[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
-  return res
+  return res, true
 }
 WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
   builder := strings.builder_make()
   defer strings.builder_destroy(&builder)
   slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
+  m: u64 = 0
   for lr in leaderboard {
-    str := fmt.aprintf("%s;%d", lr.name, lr.score, newline = true)
+    m := compute_hash(lr, m)
+    str := fmt.aprintf("%s;%d;%d", lr.name, lr.score, m, newline = true)
+    defer delete(str)
     strings.write_string(&builder, str)
-    delete(str)
   }
   os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
 }
 DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
+  if len(leaderboard) == 0 do return
   w, h := rl.GetRenderWidth(), rl.GetRenderHeight()
   start_y := h / 4 + 10
   rl.DrawRectangle(w / 4, h / 4, w / 2, h / 2, rl.WHITE)
@@ -899,6 +908,22 @@ Explosion :: struct {
 button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
   if in_button(pos, button) do flag^ = !flag^
 }
+compute_hash :: proc(lr: LeaderboardRecord, m: u64) -> u64 {
+  for {
+    n := rand.uint64()
+    str := fmt.aprintf("%s%d%d", lr.name, lr.score, m + n)
+    defer delete(str)
+    crc := hash.crc64_iso_3306(transmute([]byte)str)
+    if crc & 0xff == 0 {
+      return n
+    }
+  }
+}
+check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
+  str := fmt.aprintf("%s%d%d", lr.name, lr.score, m)
+  defer delete(str)
+  return hash.crc64_iso_3306(transmute([]byte)str) & 0xff == 0
+}
 main :: proc() {
   when ODIN_DEBUG {
     track: mem.Tracking_Allocator
@@ -914,6 +939,8 @@ main :: proc() {
       mem.tracking_allocator_destroy(&track)
     }
   }
+  rand.reset(u64(time.time_to_unix(time.now())))
+  dd :: proc() -> int {return rand.int_max(21) - 10}
   patterns := patterns_f()
   defer delete(patterns)
   threes := threes_f()
@@ -939,10 +966,13 @@ main :: proc() {
   l_offset := 0
   volume: f32 = 0.0
   leaderboard_place := -1
-  leaderboard := ReadLeaderboard()
+  leaderboard, ok := ReadLeaderboard()
+  if !ok {
+    fmt.println("Leaderboard compromised")
+    leaderboard = Leaderboard{}
+  }
   flying := make([dynamic]Particle)
   staying := make([dynamic]Explosion)
-  dd := proc() -> int {return rand.int_max(21) - 10}
   rl.InitAudioDevice()
   psound := rl.LoadSound("p.ogg")
   ksound := rl.LoadSound("k.ogg")
