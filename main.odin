@@ -30,9 +30,7 @@ shift :: proc(p: ^Pattern) {
     minX = min(pt.x, minX)
     minY = min(pt.y, minY)
   }
-  for &pt in p {
-    pt -= {minX, minY}
-  }
+  for &pt in p do pt -= {minX, minY}
 }
 rotations :: proc(p: Pattern) -> [4]Pattern {
   res: [4]Pattern
@@ -52,9 +50,7 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
 mirrored :: proc(p: Pattern) -> Pattern {
   m := make(Pattern, len(p))
   copy(m[:], p[:])
-  for i := 0; i < len(p); i += 1 {
-    m[i].y = -p[i].y
-  }
+  for i := 0; i < len(p); i += 1 do m[i].y = -p[i].y
   shift(&m)
   return m
 }
@@ -73,25 +69,19 @@ sized :: proc(p: Pattern) -> SizedPattern {
 }
 generate :: proc(p: Pattern) -> [dynamic]SizedPattern {
   s := rotations(p)
-  defer for sp in s {
-    delete(sp)
-  }
+  defer for sp in s do delete(sp)
   res1 := make([dynamic]Pattern)
   defer delete(res1)
   m := mirrored(p)
   defer delete(m)
   r := rotations(m)
-  defer for re in r {
-    delete(re)
-  }
+  defer for re in r do delete(re)
   resize(&res1, len(s) + len(r))
   copy(res1[:], r[:])
   copy(res1[len(r):], s[:])
   res2 := make([dynamic]SizedPattern)
   reserve(&res2, len(res1))
-  for pt in res1 {
-    append(&res2, sized(pt))
-  }
+  for pt in res1 do append(&res2, sized(pt))
   return res2
 }
 threes_f :: proc() -> [dynamic]SizedPattern {
@@ -199,9 +189,7 @@ delete_board :: proc(b: ^Board) {
 }
 copy_set :: proc(m: map[Pair]struct {}) -> map[Pair]struct {} {
   m1 := make(map[Pair]struct {}, len(m))
-  for k, _ in m {
-    m1[k] = {}
-  }
+  for k, _ in m do m1[k] = {}
   return m1
 }
 copy_board :: proc(b: Board) -> Board {
@@ -221,24 +209,12 @@ set_at :: proc(brd: ^Board, a, b, v: int) {
 }
 match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
-  for i := 1; i < len(p.pat); i += 1 {
-    if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
-  }
+  for i := 1; i < len(p.pat); i += 1 do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   return true
 }
 match_patterns :: proc(b: ^Board, patterns: [dynamic]SizedPattern) {
   clear(&b.matched_patterns)
-  for sp in patterns {
-    for i := 0; i <= b.w - sp.w; i += 1 {
-      for j := 0; j <= b.h - sp.h; j += 1 {
-        if match_pattern(b^, i, j, sp) {
-          for p in sp.pat {
-            b.matched_patterns[{i + p.x, j + p.y}] = {}
-          }
-        }
-      }
-    }
-  }
+  for sp in patterns do for i := 0; i <= b.w - sp.w; i += 1 do for j := 0; j <= b.h - sp.h; j += 1 do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
 }
 is_matched :: proc(b: Board, x, y: int) -> bool {
   return {x, y} in b.matched_patterns
@@ -271,9 +247,7 @@ swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
   }
 }
 fill :: proc(b: ^Board) {
-  for &x in b.board {
-    x = uniform_dist()
-  }
+  for &x in b.board do x = uniform_dist()
 }
 reasonable_coord :: proc(b: Board, i, j: int) -> bool {
   return i >= 0 && i < b.w && j >= 0 && j < b.h
@@ -286,13 +260,9 @@ remove_trios :: proc(b: ^Board) {
   for i := 0; i < b.w; i += 1 {
     for j := 0; j < b.h; j += 1 {
       offset_i, offset_j := 1, 1
-      for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) {
-        offset_j += 1
-      }
+      for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) do offset_j += 1
       if offset_j > 2 do append(&remove_i, Triple{i, j, offset_j})
-      for (i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j)) {
-        offset_i += 1
-      }
+      for (i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j)) do offset_i += 1
       if offset_i > 2 do append(&remove_j, Triple{i, j, offset_i})
     }
   }
@@ -382,9 +352,7 @@ fill_up :: proc(b: ^Board) {
     for j := 0; j < b.h; j += 1 {
       if at(b^, i, j) == 0 {
         curr_i = i
-        for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == 0 {
-          curr_i += 1
-        }
+        for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == 0 do curr_i += 1
         for k := curr_i; k >= 0; k -= 1 {
           if at(b^, k, j) != 0 {
             set_at(b, curr_i, j, at(b^, k, j))
@@ -410,24 +378,12 @@ fill_up :: proc(b: ^Board) {
 }
 compare_boards :: proc(b1: Board, b2: Board) -> bool {
   if b1.w != b2.w || b1.h != b2.h do return false
-  for i := 0; i < b1.w * b1.h; i += 1 {
-    if b1.board[i] != b2.board[i] do return false
-  }
+  for i := 0; i < b1.w * b1.h; i += 1 do if b1.board[i] != b2.board[i] do return false
   return true
 }
 match_threes :: proc(b: ^Board, threes: [dynamic]SizedPattern) {
   clear(&b.matched_threes)
-  for sp in threes {
-    for i := 0; i <= b.w - sp.w; i += 1 {
-      for j := 0; j <= b.h - sp.h; j += 1 {
-        if match_pattern(b^, i, j, sp) {
-          for p in sp.pat {
-            b.matched_threes[{i + p.x, j + p.y}] = {}
-          }
-        }
-      }
-    }
-  }
+  for sp in threes do for i := 0; i <= b.w - sp.w; i += 1 do for j := 0; j <= b.h - sp.h; j += 1 do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_threes[{i + p.x, j + p.y}] = {}
 }
 is_three :: proc(b: Board, i, j: int) -> bool {
   return {i, j} in b.matched_threes
@@ -575,13 +531,9 @@ prepare_removals :: proc(b: ^Board) {
   for i := 0; i < b.w; i += 1 {
     for j := 0; j < b.h; j += 1 {
       offset_j, offset_i := 1, 1
-      for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) {
-        offset_j += 1
-      }
+      for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) do offset_j += 1
       if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
-      for i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j) {
-        offset_i += 1
-      }
+      for i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j) do offset_i += 1
       if offset_i > 2 do append(&b.rm_j, Triple{i, j, offset_i})
     }
   }
@@ -612,9 +564,7 @@ LeaderboardRecord :: struct {
 }
 Leaderboard :: distinct [dynamic]LeaderboardRecord
 delete_leaderboard :: proc(l: ^Leaderboard) {
-  for lr in l {
-    delete(lr.name)
-  }
+  for lr in l do delete(lr.name)
 }
 ReadLeaderboard :: proc() -> (Leaderboard, bool) {
   res := make(Leaderboard)
@@ -631,9 +581,7 @@ ReadLeaderboard :: proc() -> (Leaderboard, bool) {
         lr.name = strings.clone(parts[0])
         lr.score = strconv.atoi(parts[1])
         h, ok := strconv.parse_u64(parts[2])
-        if !ok || !check_hash(lr, h) {
-          return nil, false
-        }
+        if !ok || !check_hash(lr, h) do return nil, false
         append(&res, lr)
       }
     }
@@ -788,19 +736,13 @@ save :: proc(g: Game, auto_clean: bool = false) {
 save_board :: proc(b: ^strings.Builder, board: Board) {
   fmt.sbprintf(b, "%d\n%d\n%d\n%d\n%d\n%d %d\n", board.score, board.normals, board.longers, board.longests, board.crosses, board.w, board.h)
   for i := 0; i < board.w; i += 1 {
-    for j := 0; j < board.h; j += 1 {
-      fmt.sbprintf(b, "%d ", at(board, i, j))
-    }
+    for j := 0; j < board.h; j += 1 do fmt.sbprintf(b, "%d ", at(board, i, j))
     fmt.sbprintf(b, "\n")
   }
   fmt.sbprintf(b, "%d\n", len(board.magic_tiles))
-  for key, _ in board.magic_tiles {
-    fmt.sbprintf(b, "%d %d ", key.first, key.second)
-  }
+  for key, _ in board.magic_tiles do fmt.sbprintf(b, "%d %d ", key.first, key.second)
   fmt.sbprintf(b, "\n%d\n", len(board.magic_tiles2))
-  for key, _ in board.magic_tiles2 {
-    fmt.sbprintf(b, "%d %d ", key.first, key.second)
-  }
+  for key, _ in board.magic_tiles2 do fmt.sbprintf(b, "%d %d ", key.first, key.second)
   fmt.sbprintf(b, "\n")
 }
 load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error {
@@ -937,9 +879,7 @@ compute_hash :: proc(lr: LeaderboardRecord, m: u64) -> u64 {
     str := fmt.aprintf("%s%d%d", lr.name, lr.score, m + n)
     defer delete(str)
     crc := hash.crc64_iso_3306(transmute([]byte)str)
-    if crc & 0xff == 0 {
-      return n
-    }
+    if crc & 0xff == 0 do return n
   }
 }
 check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
@@ -955,9 +895,7 @@ main :: proc() {
     defer {
       if len(track.allocation_map) > 0 {
         fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
-        for _, entry in track.allocation_map {
-          fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
-        }
+        for _, entry in track.allocation_map do fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
       }
       mem.tracking_allocator_destroy(&track)
     }
@@ -974,16 +912,12 @@ main :: proc() {
   dd :: proc() -> int {return rand.int_max(21) - 10}
   patterns := patterns_f()
   defer {
-    for p in patterns {
-      delete(p.pat)
-    }
+    for p in patterns do delete(p.pat)
     delete(patterns)
   }
   threes := threes_f()
   defer {
-    for t in threes {
-      delete(t.pat)
-    }
+    for t in threes do delete(t.pat)
     delete(threes)
   }
   w: i32 = 1280
