@@ -36,9 +36,9 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
   res: [4]Pattern
   res[0] = make(Pattern, len(p))
   copy(res[0][:], p[:])
-  for i := 1; i < 4; i += 1 {
+  for i in 1 ..< 4 {
     rotated := make(Pattern, len(p))
-    for j := 0; j < len(p); j += 1 {
+    for j in 0 ..< len(p) {
       rotated[j].x = res[i - 1][j].y
       rotated[j].y = -res[i - 1][j].x
     }
@@ -50,7 +50,7 @@ rotations :: proc(p: Pattern) -> [4]Pattern {
 mirrored :: proc(p: Pattern) -> Pattern {
   m := make(Pattern, len(p))
   copy(m[:], p[:])
-  for i := 0; i < len(p); i += 1 do m[i].y = -p[i].y
+  for i in 0 ..< len(p) do m[i].y = -p[i].y
   shift(&m)
   return m
 }
@@ -209,12 +209,12 @@ set_at :: proc(brd: ^Board, a, b, v: int) {
 }
 match_pattern :: proc(b: Board, x, y: int, p: SizedPattern) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
-  for i := 1; i < len(p.pat); i += 1 do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
+  for i in 1 ..< len(p.pat) do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   return true
 }
 match_patterns :: proc(b: ^Board, patterns: [dynamic]SizedPattern) {
   clear(&b.matched_patterns)
-  for sp in patterns do for i := 0; i <= b.w - sp.w; i += 1 do for j := 0; j <= b.h - sp.h; j += 1 do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
+  for sp in patterns do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
 }
 is_matched :: proc(b: Board, x, y: int) -> bool {
   return {x, y} in b.matched_patterns
@@ -257,8 +257,8 @@ remove_trios :: proc(b: ^Board) {
   defer delete(remove_i)
   remove_j := make([dynamic]Triple)
   defer delete(remove_j)
-  for i := 0; i < b.w; i += 1 {
-    for j := 0; j < b.h; j += 1 {
+  for i in 0 ..< b.w {
+    for j in 0 ..< b.h {
       offset_i, offset_j := 1, 1
       for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) do offset_j += 1
       if offset_j > 2 do append(&remove_i, Triple{i, j, offset_j})
@@ -275,7 +275,7 @@ remove_trios :: proc(b: ^Board) {
       b.longers += 1
       b.normals += max(0, b.normals - 1)
     }
-    for jj := j; jj < j + offset; jj += 1 {
+    for jj in j ..< j + offset {
       set_at(b, i, jj, 0)
       if is_magic(b^, i, jj) {
         b.score -= 3
@@ -288,7 +288,7 @@ remove_trios :: proc(b: ^Board) {
       b.score += 1
     }
     if offset == 5 {
-      for i := 0; i < b.w; i += 1 {
+      for i in 0 ..< b.w {
         set_at(b, uniform_dist_2(b^), uniform_dist_3(b^), 0)
         b.score += 1
       }
@@ -305,7 +305,7 @@ remove_trios :: proc(b: ^Board) {
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
-    for ii := i; ii < i + offset; ii += 1 {
+    for ii in i ..< i + offset {
       set_at(b, ii, j, 0)
       if is_magic(b^, ii, j) {
         b.score -= 3
@@ -318,7 +318,7 @@ remove_trios :: proc(b: ^Board) {
       b.score += 1
     }
     if offset == 5 {
-      for i := 0; i < b.w; i += 1 {
+      for i in 0 ..< b.w {
         set_at(b, uniform_dist_2(b^), uniform_dist_3(b^), 0)
         b.score += 1
       }
@@ -326,14 +326,14 @@ remove_trios :: proc(b: ^Board) {
       b.normals = max(0, b.normals - 1)
     }
   }
-  for i := 0; i < len(remove_i); i += 1 {
-    for j := 0; j < len(remove_j); j += 1 {
+  for i in 0 ..< len(remove_i) {
+    for j in 0 ..< len(remove_j) {
       t1, t2 := remove_i[i], remove_j[j]
       i1, j1, o1 := t1.first, t1.second, t1.third
       i2, j2, o2 := t2.first, t2.second, t2.third
       if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
-        for m := -1; m < 2; m += 1 {
-          for n := -1; n < 2; n += 1 {
+        for m in -1 ..< 2 {
+          for n in -1 ..< 2 {
             if reasonable_coord(b^, i1 + m, j1 + n) {
               set_at(b, i1 + m, j1 + n, 0)
               b.score += 1
@@ -348,8 +348,8 @@ remove_trios :: proc(b: ^Board) {
 }
 fill_up :: proc(b: ^Board) {
   curr_i := -1
-  for i := 0; i < b.w; i += 1 {
-    for j := 0; j < b.h; j += 1 {
+  for i in 0 ..< b.w {
+    for j in 0 ..< b.h {
       if at(b^, i, j) == 0 {
         curr_i = i
         for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == 0 do curr_i += 1
@@ -378,12 +378,12 @@ fill_up :: proc(b: ^Board) {
 }
 compare_boards :: proc(b1: Board, b2: Board) -> bool {
   if b1.w != b2.w || b1.h != b2.h do return false
-  for i := 0; i < b1.w * b1.h; i += 1 do if b1.board[i] != b2.board[i] do return false
+  for i in 0 ..< b1.w * b1.h do if b1.board[i] != b2.board[i] do return false
   return true
 }
 match_threes :: proc(b: ^Board, threes: [dynamic]SizedPattern) {
   clear(&b.matched_threes)
-  for sp in threes do for i := 0; i <= b.w - sp.w; i += 1 do for j := 0; j <= b.h - sp.h; j += 1 do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_threes[{i + p.x, j + p.y}] = {}
+  for sp in threes do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_threes[{i + p.x, j + p.y}] = {}
 }
 is_three :: proc(b: Board, i, j: int) -> bool {
   return {i, j} in b.matched_threes
@@ -424,7 +424,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
-    for jj := j; jj < j + offset; jj += 1 {
+    for jj in j ..< j + offset {
       append(&res, Triple{i, jj, at(b^, i, jj)})
       set_at(b, i, jj, 0)
       if is_magic(b^, i, jj) {
@@ -440,7 +440,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
     if offset == 5 {
       r := make(map[Pair]struct {})
       defer delete(r)
-      for i := 0; i < b.w; i += 1 {
+      for i in 0 ..< b.w {
         x, y: int
         for {
           x = uniform_dist_2(b^)
@@ -468,7 +468,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
-    for ii := i; ii < i + offset; ii += 1 {
+    for ii in i ..< i + offset {
       append(&res, Triple{ii, j, at(b^, ii, j)})
       set_at(b, ii, j, 0)
       if is_magic(b^, ii, j) {
@@ -484,7 +484,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
     if offset == 5 {
       r := make(map[Pair]struct {})
       defer delete(r)
-      for i := 0; i < b.w; i += 1 {
+      for i in 0 ..< b.w {
         x, y: int
         for {
           x = uniform_dist_2(b^)
@@ -506,8 +506,8 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   if len(b.rm_b) != 0 {
     t := b.rm_b[len(b.rm_b) - 1]
     i, j := t.first, t.second
-    for m := -2; m < 3; m += 1 {
-      for n := -2; n < 3; n += 1 {
+    for m in -2 ..< 3 {
+      for n in -2 ..< 3 {
         if reasonable_coord(b^, i + m, j + n) {
           append(&res, Triple{i + m, j + n, at(b^, i + m, j + n)})
           set_at(b, i + m, j + n, 0)
@@ -528,8 +528,8 @@ prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_b)
   clear(&b.matched_patterns)
   clear(&b.matched_threes)
-  for i := 0; i < b.w; i += 1 {
-    for j := 0; j < b.h; j += 1 {
+  for i in 0 ..< b.w {
+    for j in 0 ..< b.h {
       offset_j, offset_i := 1, 1
       for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) do offset_j += 1
       if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
@@ -537,8 +537,8 @@ prepare_removals :: proc(b: ^Board) {
       if offset_i > 2 do append(&b.rm_j, Triple{i, j, offset_i})
     }
   }
-  for i := 0; i < len(b.rm_i); i += 1 {
-    for j := 0; j < len(b.rm_j); j += 1 {
+  for i in 0 ..< len(b.rm_i) {
+    for j in 0 ..< len(b.rm_j) {
       t1, t2 := b.rm_i[i], b.rm_j[j]
       i1, j1, o1 := t1.first, t1.second, t1.third
       i2, j2, o2 := t2.first, t2.second, t2.third
@@ -611,7 +611,7 @@ DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
   slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
   offset := min(offset, len(leaderboard) - 1)
   finish := min(offset + 9, len(leaderboard))
-  for i := offset; i < finish; i += 1 {
+  for i in offset ..< finish {
     lr := leaderboard[i]
     text := fmt.ctprintf("%d. %s: %d", i, lr.name, lr.score, newline = true)
     start_y += 30
@@ -735,8 +735,8 @@ save :: proc(g: Game, auto_clean: bool = false) {
 }
 save_board :: proc(b: ^strings.Builder, board: Board) {
   fmt.sbprintf(b, "%d\n%d\n%d\n%d\n%d\n%d %d\n", board.score, board.normals, board.longers, board.longests, board.crosses, board.w, board.h)
-  for i := 0; i < board.w; i += 1 {
-    for j := 0; j < board.h; j += 1 do fmt.sbprintf(b, "%d ", at(board, i, j))
+  for i in 0 ..< board.w {
+    for j in 0 ..< board.h do fmt.sbprintf(b, "%d ", at(board, i, j))
     fmt.sbprintf(b, "\n")
   }
   fmt.sbprintf(b, "%d\n", len(board.magic_tiles))
@@ -764,22 +764,22 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error 
   g.board.w = read_value(&r, ' ') or_return
   g.board.h = read_value(&r) or_return
   resize(&g.board.board, g.board.w * g.board.h)
-  for i := 0; i < g.board.w; i += 1 {
-    for j := 0; j < g.board.h; j += 1 {
+  for i in 0 ..< g.board.w {
+    for j in 0 ..< g.board.h {
       val := read_value(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
       set_at(&g.board, i, j, val)
     }
   }
   mt := read_value(&r) or_return
   clear(&g.board.magic_tiles)
-  for i := 0; i < mt; i += 1 {
+  for i in 0 ..< mt {
     x := read_value(&r, ' ') or_return
     y := read_value(&r, ' ') or_return
     g.board.magic_tiles[{x, y}] = {}
   }
   mt = read_value(&r) or_return
   clear(&g.board.magic_tiles2)
-  for i := 0; i < mt; i += 1 {
+  for i in 0 ..< mt {
     x := read_value(&r, ' ') or_return
     y := read_value(&r, ' ') or_return
     g.board.magic_tiles2[{x, y}] = {}
@@ -1023,8 +1023,8 @@ main :: proc() {
     rl.BeginDrawing()
     rl.ClearBackground(rl.RAYWHITE)
     rl.DrawRectangle(board_x, board_y, ss * i32(board_size), ss * i32(board_size), rl.BLACK)
-    for i := 0; i < board_size; i += 1 {
-      for j := 0; j < board_size; j += 1 {
+    for i in 0 ..< board_size {
+      for j in 0 ..< board_size {
         pos_x, pos_y := board_x + i32(i) * ss + so, board_y + i32(j) * ss + so
         radius := (ss - 2 * so) / 2
         if is_matched(game.board, j, i) && hints {
