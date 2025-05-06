@@ -2,6 +2,7 @@
 package main
 
 import "core:bufio"
+import "core:flags"
 import "core:fmt"
 import "core:hash"
 import "core:io"
@@ -872,8 +873,8 @@ step_game :: proc(g: ^Game) -> [dynamic]Triple {
   g.first_work = false
   return res
 }
-is_finished :: proc(g: Game) -> bool {
-  return g.counter == 50
+is_finished :: proc(g: Game, max_steps: int = 50) -> bool {
+  return g.counter == max_steps
 }
 is_processing :: proc(g: Game) -> bool {
   return g.work_board
@@ -939,6 +940,14 @@ main :: proc() {
       mem.tracking_allocator_destroy(&track)
     }
   }
+  Options :: struct {
+    steps: int "args:name=steps",
+    score: int "args:name=score",
+  }
+  opts: Options
+  flags.parse_or_exit(&opts, os.args)
+  opts.score = opts.score == 0 ? 1000 : opts.score
+  opts.steps = opts.steps == 0 ? 50 : opts.steps
   rand.reset(u64(time.time_to_unix(time.now())))
   dd :: proc() -> int {return rand.int_max(21) - 10}
   patterns := patterns_f()
@@ -1288,7 +1297,7 @@ main :: proc() {
         }
       }
     }
-    if is_finished(game) {
+    if is_finished(game, opts.steps) {
       for lr, idx in leaderboard {
         if lr.score < game.board.score {
           inject_at(&leaderboard, idx, LeaderboardRecord{game.name, game.board.score})
