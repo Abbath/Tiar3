@@ -1024,15 +1024,15 @@ main :: proc() {
         }
         switch at(game.board, j, i) {
         case 1:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
         case 2:
           rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
         case 3:
           rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
         case 4:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 3, f32(radius) - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
         case 5:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
         case 6:
           rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.BEIGE : rl.YELLOW)
         }
