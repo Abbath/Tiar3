@@ -48,13 +48,13 @@ rotations_p :: proc(p: Pat($N)) -> (res: [4]Pat(N)) {
     shift_p(&rotated)
     res[i] = rotated
   }
-  return res
+  return
 }
 mirrored_p :: proc(p: Pat($N)) -> (m: Pat(N)) {
   m = p
   for i in 0 ..< N do m.pat[i].y = -p.pat[i].y
   shift_p(&m)
-  return m
+  return
 }
 sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   res.pat = p.pat
@@ -65,7 +65,7 @@ sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   }
   res.w = maxX + 1
   res.h = maxY + 1
-  return res
+  return
 }
 generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
   s := rotations_p(p)
@@ -75,29 +75,23 @@ generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
   copy(res1[:], r[:])
   copy(res1[4:], s[:])
   for i in 0 ..< 8 do res2[i] = sized_p(res1[i])
-  return res2
+  return
 }
 threes_p :: proc() -> (res: [24]SPat(3)) {
-  three_p_1: Pat(3) = {{{0, 0}, {1, 1}, {0, 2}}}
-  three_p_2: Pat(3) = {{{1, 0}, {0, 1}, {0, 2}}}
-  three_p_3: Pat(3) = {{{0, 0}, {0, 1}, {0, 3}}}
-  threes1, threes2, threes3 := generate_p(three_p_1), generate_p(three_p_2), generate_p(three_p_3)
+  threes1, threes2, threes3 := generate_p(Pat(3){{{0, 0}, {1, 1}, {0, 2}}}), generate_p(Pat(3){{{1, 0}, {0, 1}, {0, 2}}}), generate_p(Pat(3){{{0, 0}, {0, 1}, {0, 3}}})
   copy(res[:], threes1[:])
   copy(res[8:], threes2[:])
   copy(res[16:], threes3[:])
-  return res
+  return
 }
 fours_p :: proc() -> [8]SPat(4) {
-  four_p: Pat(4) = {{{0, 0}, {1, 1}, {0, 2}, {0, 3}}}
-  return generate_p(four_p)
+  return generate_p(Pat(4){{{0, 0}, {1, 1}, {0, 2}, {0, 3}}})
 }
 fives_p :: proc() -> (res: [16]SPat(5)) {
-  five_p_1: Pat(5) = {{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}
-  five_p_2: Pat(5) = {{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}}
-  fives1, fives2 := generate_p(five_p_1), generate_p(five_p_2)
+  fives1, fives2 := generate_p(Pat(5){{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}), generate_p(Pat(5){{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}})
   copy(res[:], fives1[:])
   copy(res[8:], fives2[:])
-  return res
+  return
 }
 Pair :: struct {
   first:  int,
@@ -151,7 +145,7 @@ make_board :: proc(w, h: int) -> (b: Board) {
   b.rm_i = make([dynamic]Triple)
   b.rm_j = make([dynamic]Triple)
   b.rm_b = make([dynamic]Pair)
-  return b
+  return
 }
 delete_board :: proc(b: ^Board) {
   delete(b.board)
@@ -559,9 +553,7 @@ ReadLeaderboard :: proc() -> (Leaderboard, bool) {
       parts, err := strings.split(line, ";")
       defer if err == .None do delete(parts)
       if len(parts) == 3 {
-        lr: LeaderboardRecord
-        lr.name = strings.clone(parts[0])
-        lr.score = strconv.atoi(parts[1])
+        lr := LeaderboardRecord{strings.clone(parts[0]), strconv.atoi(parts[1])}
         h, ok := strconv.parse_u64(parts[2])
         if !ok || !check_hash(lr, h + m) {
           delete(res)
@@ -820,7 +812,7 @@ step_game :: proc(g: ^Game) -> (res: [dynamic]Triple) {
   res = remove_one_thing(&g.board)
   fill_up(&g.board)
   g.first_work = false
-  return res
+  return
 }
 is_finished :: proc(g: Game, max_steps: int = 50) -> bool {
   return g.counter == max_steps
@@ -829,15 +821,7 @@ is_processing :: proc(g: Game) -> bool {
   return g.work_board
 }
 game_stats :: proc(g: Game) -> string {
-  return fmt.tprintf(
-    "Moves: %d\nScore: %d\nTrios: %d\nQuartets: %d\nQuintets: %d\nCrosses: %d",
-    g.counter,
-    g.board.score,
-    g.board.normals,
-    g.board.longers,
-    g.board.longests,
-    g.board.crosses,
-  )
+  return fmt.tprintf("Moves: %d\nScore: %d\nTrios: %d\nQuartets: %d\nQuintets: %d\nCrosses: %d", g.counter, g.board.score, g.board.normals, g.board.longers, g.board.longests, g.board.crosses)
 }
 Particle :: struct {
   dx:       f32,
@@ -858,13 +842,13 @@ Explosion :: struct {
 button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
   if in_button(pos, button) do flag^ = !flag^
 }
-compute_hash :: proc(lr: LeaderboardRecord, m: u64) -> u64 {
+compute_hash :: proc(lr: LeaderboardRecord, m: u64) -> (n: u64) {
   for {
-    n := rand.uint64()
+    n = rand.uint64()
     str := fmt.aprintf("%s%d%d", lr.name, lr.score, m + n)
     defer delete(str)
     crc := hash.crc64_iso_3306(transmute([]byte)str)
-    if crc & 0xff == 0 do return n
+    if crc & 0xff == 0 do return
   }
 }
 check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
@@ -991,10 +975,7 @@ main :: proc() {
             c = nonacid_colors ? rl.BEIGE : rl.YELLOW
             s = 4
           }
-          append(
-            &flying,
-            Particle{f32(dd()), f32(dd()), f32(dd()), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s},
-          )
+          append(&flying, Particle{f32(dd()), f32(dd()), f32(dd()), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s})
           append(&staying, Explosion{it.second, it.first, 0})
         }
       }
@@ -1039,49 +1020,16 @@ main :: proc() {
         radius := (ss - 2 * so) / 2
         pos_x, pos_y := board_x + saved_col * ss + so, board_y + saved_row * ss + so
         if dx == 1 && dy == 0 || dx == 0 && dy == 1 {
-          (dx == 1 ? rl.DrawRectangleGradientH : rl.DrawRectangleGradientV)(
-            pos_x + radius - 10,
-            pos_y + radius - 10,
-            dx == 1 ? ss / 2 : 20,
-            dy == 1 ? ss / 2 : 20,
-            rl.BLANK,
-            rl.MAROON,
-          )
-          rl.DrawPoly(
-            {f32(pos_x + radius + (dx == 1 ? ss / 2 : 0)), f32(pos_y + radius + (dy == 1 ? ss / 2 : 0))},
-            3,
-            f32(radius) - mo,
-            dx == 1 ? 0 : 90,
-            rl.MAROON,
-          )
+          (dx == 1 ? rl.DrawRectangleGradientH : rl.DrawRectangleGradientV)(pos_x + radius - 10, pos_y + radius - 10, dx == 1 ? ss / 2 : 20, dy == 1 ? ss / 2 : 20, rl.BLANK, rl.MAROON)
+          rl.DrawPoly({f32(pos_x + radius + (dx == 1 ? ss / 2 : 0)), f32(pos_y + radius + (dy == 1 ? ss / 2 : 0))}, 3, f32(radius) - mo, dx == 1 ? 0 : 90, rl.MAROON)
         }
         if dx == -1 && dy == 0 || dx == 0 && dy == -1 {
           if dx == -1 {
-            rl.DrawRectangleGradientH(
-              pos_x + radius - (dx == -1 ? ss / 2 - 10 : 0),
-              pos_y + radius - (dy == -1 ? ss / 2 : 10),
-              dx == -1 ? ss / 2 : 20,
-              dy == -1 ? ss / 2 + 10 : 20,
-              rl.MAROON,
-              rl.BLANK,
-            )
+            rl.DrawRectangleGradientH(pos_x + radius - (dx == -1 ? ss / 2 - 10 : 0), pos_y + radius - (dy == -1 ? ss / 2 : 10), dx == -1 ? ss / 2 : 20, dy == -1 ? ss / 2 + 10 : 20, rl.MAROON, rl.BLANK)
           } else {
-            rl.DrawRectangleGradientV(
-              pos_x + radius - (dx == -1 ? ss / 2 : 10),
-              pos_y + radius - (dy == -1 ? ss / 2 - 10 : 0),
-              dx == -1 ? ss / 2 + 10 : 20,
-              dy == -1 ? ss / 2 : 20,
-              rl.MAROON,
-              rl.BLANK,
-            )
+            rl.DrawRectangleGradientV(pos_x + radius - (dx == -1 ? ss / 2 : 10), pos_y + radius - (dy == -1 ? ss / 2 - 10 : 0), dx == -1 ? ss / 2 + 10 : 20, dy == -1 ? ss / 2 : 20, rl.MAROON, rl.BLANK)
           }
-          rl.DrawPoly(
-            {f32(pos_x + radius - (dx == -1 ? ss / 2 : 0)), f32(pos_y + radius - (dy == -1 ? ss / 2 : 0))},
-            3,
-            f32(radius) - mo,
-            dx == -1 ? 180 : 270,
-            rl.MAROON,
-          )
+          rl.DrawPoly({f32(pos_x + radius - (dx == -1 ? ss / 2 : 0)), f32(pos_y + radius - (dy == -1 ? ss / 2 : 0))}, 3, f32(radius) - mo, dx == -1 ? 180 : 270, rl.MAROON)
         }
       }
     }
