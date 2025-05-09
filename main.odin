@@ -38,8 +38,7 @@ shift_p :: proc(p: ^Pat($N)) {
   }
   for &pt in p.pat do pt -= {minX, minY}
 }
-rotations_p :: proc(p: Pat($N)) -> [4]Pat(N) {
-  res: [4]Pat(N)
+rotations_p :: proc(p: Pat($N)) -> (res: [4]Pat(N)) {
   res[0] = p
   for i in 1 ..< 4 {
     rotated: Pat(N)
@@ -52,14 +51,13 @@ rotations_p :: proc(p: Pat($N)) -> [4]Pat(N) {
   }
   return res
 }
-mirrored_p :: proc(p: Pat($N)) -> Pat(N) {
-  m: Pat(N) = p
+mirrored_p :: proc(p: Pat($N)) -> (m: Pat(N)) {
+  m = p
   for i in 0 ..< N do m.pat[i].y = -p.pat[i].y
   shift_p(&m)
   return m
 }
-sized_p :: proc(p: Pat($N)) -> SPat(N) {
-  res: SPat(N)
+sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   res.pat = p.pat
   maxX, maxY := min(int), min(int)
   for pt in p.pat {
@@ -70,23 +68,21 @@ sized_p :: proc(p: Pat($N)) -> SPat(N) {
   res.h = int(maxY + 1)
   return res
 }
-generate_p :: proc(p: Pat($N)) -> [8]SPat(N) {
+generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
   s := rotations_p(p)
   m := mirrored_p(p)
   r := rotations_p(m)
   res1: [8]Pat(N)
   copy(res1[:], r[:])
   copy(res1[4:], s[:])
-  res2: [8]SPat(N)
   for i in 0 ..< 8 do res2[i] = sized_p(res1[i])
   return res2
 }
-threes_p :: proc() -> [24]SPat(3) {
+threes_p :: proc() -> (res: [24]SPat(3)) {
   three_p_1: Pat(3) = {{{0, 0}, {1, 1}, {0, 2}}}
   three_p_2: Pat(3) = {{{1, 0}, {0, 1}, {0, 2}}}
   three_p_3: Pat(3) = {{{0, 0}, {0, 1}, {0, 3}}}
   threes1, threes2, threes3 := generate_p(three_p_1), generate_p(three_p_2), generate_p(three_p_3)
-  res: [24]SPat(3)
   copy(res[:], threes1[:])
   copy(res[8:], threes2[:])
   copy(res[16:], threes3[:])
@@ -96,11 +92,10 @@ fours_p :: proc() -> [8]SPat(4) {
   four_p: Pat(4) = {{{0, 0}, {1, 1}, {0, 2}, {0, 3}}}
   return generate_p(four_p)
 }
-fives_p :: proc() -> [16]SPat(5) {
+fives_p :: proc() -> (res: [16]SPat(5)) {
   five_p_1: Pat(5) = {{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}
   five_p_2: Pat(5) = {{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}}
   fives1, fives2 := generate_p(five_p_1), generate_p(five_p_2)
-  res: [16]SPat(5)
   copy(res[:], fives1[:])
   copy(res[8:], fives2[:])
   return res
@@ -146,8 +141,7 @@ uniform_dist_2 :: proc(b: Board) -> int {
 uniform_dist_3 :: proc(b: Board) -> int {
   return rand.int_max(b.h)
 }
-make_board :: proc(w, h: int) -> Board {
-  b: Board
+make_board :: proc(w, h: int) -> (b: Board) {
   b.w = w
   b.h = h
   b.board = make([dynamic]int, w * h)
@@ -814,8 +808,7 @@ attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
   swap(&g.board, row1, col1, row2, col2)
   prepare_removals(&g.board)
 }
-step_game :: proc(g: ^Game) -> [dynamic]Triple {
-  res: [dynamic]Triple
+step_game :: proc(g: ^Game) -> (res: [dynamic]Triple) {
   if !has_removals(g.board) do prepare_removals(&g.board)
   if !has_removals(g.board) {
     if g.first_work {
