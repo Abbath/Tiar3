@@ -18,7 +18,6 @@ import "core:unicode"
 import rl "vendor:raylib"
 
 Point :: distinct [2]int
-Pattern :: distinct [dynamic]Point
 Pat :: struct($N: int) {
   pat: [N]Point,
 }
@@ -64,8 +63,8 @@ sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
     maxX = max(pt.x, maxX)
     maxY = max(pt.y, maxY)
   }
-  res.w = int(maxX + 1)
-  res.h = int(maxY + 1)
+  res.w = maxX + 1
+  res.h = maxY + 1
   return res
 }
 generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
@@ -395,7 +394,6 @@ zero :: proc(b: ^Board) {
   b.longests = 0
   b.crosses = 0
 }
-// New interface starts here
 remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
   res := make([dynamic]Triple)
   if len(b.rm_i) != 0 {
