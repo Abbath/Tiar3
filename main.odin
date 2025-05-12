@@ -26,9 +26,9 @@ SPat :: struct($N: int) {
   w:             int,
   h:             int,
 }
-Threes :: distinct [24]SPat(3)
-Fours :: distinct [8]SPat(4)
-Fives :: distinct [16]SPat(5)
+Threes :: [24]SPat(3)
+Fours :: [8]SPat(4)
+Fives :: [16]SPat(5)
 shift_p :: proc(p: ^Pat($N)) {
   minX, minY := max(int), max(int)
   for pt in p.pat {
@@ -182,11 +182,8 @@ match_pattern :: proc(b: Board, x, y: int, p: SPat($N)) -> bool {
   for i in 1 ..< len(p.pat) do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   return true
 }
-match_fours :: proc(b: ^Board, fours: Fours) {
-  for sp in fours do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
-}
-match_fives :: proc(b: ^Board, fives: Fives) {
-  for sp in fives do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
+match_patterns :: proc(b: ^Board, patterns: [$M]SPat($N)) {
+  for sp in patterns do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
 }
 is_matched :: proc(b: Board, x, y: int) -> bool {
   return {x, y} in b.matched_patterns
@@ -369,16 +366,16 @@ stabilize :: proc(b: ^Board, threes: Threes, fours: Fours, fives: Fives) {
     if compare_boards(old_board, b^) do break
   }
   clear(&b.matched_patterns)
-  match_fours(b, fours)
-  match_fives(b, fives)
+  match_patterns(b, fours)
+  match_patterns(b, fives)
   match_threes(b, threes)
 }
 step :: proc(b: ^Board, threes: Threes, fours: Fours, fives: Fives) {
   remove_trios(b)
   fill_up(b)
   clear(&b.matched_patterns)
-  match_fours(b, fours)
-  match_fives(b, fives)
+  match_patterns(b, fours)
+  match_patterns(b, fives)
   match_threes(b, threes)
 }
 zero :: proc(b: ^Board) {
@@ -787,8 +784,8 @@ restore_state :: proc(g: ^Game) {
   g.board = copy_board(g.old_board)
 }
 match :: proc(g: ^Game) {
-  match_fours(&g.board, g.fours)
-  match_fives(&g.board, g.fives)
+  match_patterns(&g.board, g.fours)
+  match_patterns(&g.board, g.fives)
   match_threes(&g.board, g.threes)
 }
 attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
@@ -924,7 +921,6 @@ main :: proc() {
   icon := rl.LoadImage("icon.png")
   rl.SetWindowIcon(icon)
   rl.SetTargetFPS(60)
-  // rl.SetTextLineSpacing(23)
   for !rl.WindowShouldClose() {
     rl.SetMasterVolume(volume)
     if frame_counter == 60 {
@@ -944,9 +940,9 @@ main :: proc() {
     if is_processing(game) && frame_counter % 6 == 0 {
       f := step_game(&game)
       defer delete(f)
-      if is_play_sound && !(len(f) == 0) && rl.IsSoundReady(psound) do rl.PlaySound(psound)
+      if is_play_sound && len(f) != 0 && rl.IsSoundReady(psound) do rl.PlaySound(psound)
       if particles {
-        if is_play_sound && !(len(f) == 0) {
+        if is_play_sound && len(f) != 0 {
           board_x += i32(dd())
           board_y += i32(dd())
         }
@@ -1079,6 +1075,7 @@ main :: proc() {
     play_sound(bm)
     volume = bm.volume
     if volume < 0.05 do volume = 0
+    if volume >= 0.99 do volume = 1
     is_play_sound = volume != 0
     if particles {
       new_staying := make([dynamic]Explosion)
