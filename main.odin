@@ -102,8 +102,13 @@ Triple :: struct {
   second: int,
   third:  int,
 }
+IndexedTile :: struct {
+  first:  int,
+  second: int,
+  third:  Tile,
+}
 Board :: struct {
-  board:            [dynamic]int,
+  board:            [dynamic]Tile,
   w:                int,
   h:                int,
   matched_patterns: map[Pair]struct {},
@@ -119,6 +124,16 @@ Board :: struct {
   longests:         int,
   crosses:          int,
 }
+Tile :: enum {
+  NONE,
+  SQUARE,
+  CIRCLE,
+  HEXAGON,
+  TRIANGLE,
+  PENTAGON,
+  RHOMBUS,
+  BRICK,
+}
 coin :: proc() -> int {
   return rand.int_max(42) + 1
 }
@@ -126,7 +141,7 @@ coin2 :: proc() -> int {
   return rand.int_max(69) + 1
 }
 uniform_dist :: proc() -> int {
-  return rand.int_max(6) + 1
+  return rand.int_max(int(max(Tile))) + 1
 }
 uniform_dist_2 :: proc(b: Board) -> int {
   return rand.int_max(b.w)
@@ -137,7 +152,7 @@ uniform_dist_3 :: proc(b: Board) -> int {
 make_board :: proc(w, h: int) -> (b: Board) {
   b.w = w
   b.h = h
-  b.board = make([dynamic]int, w * h)
+  b.board = make([dynamic]Tile, w * h)
   b.matched_patterns = make(map[Pair]struct {})
   b.matched_threes = make(map[Pair]struct {})
   b.magic_tiles = make(map[Pair]struct {})
@@ -169,16 +184,23 @@ copy_board :: proc(b: Board) -> Board {
   b1.matched_patterns = copy_set(b.matched_patterns)
   b1.magic_tiles = copy_set(b.magic_tiles)
   b1.magic_tiles2 = copy_set(b.magic_tiles2)
+  b1.normals = b.normals
+  b1.longers = b.longers
+  b1.longests = b.longests
+  b1.crosses = b.crosses
   return b1
 }
-at :: proc(brd: Board, a, b: int) -> int {
+at :: proc(brd: Board, a, b: int) -> Tile {
   return brd.board[a * brd.h + b]
 }
-set_at :: proc(brd: ^Board, a, b, v: int) {
+set_at :: proc(brd: ^Board, a, b: int, v: Tile = .NONE) {
   brd.board[a * brd.h + b] = v
 }
 match_pattern :: proc(b: Board, x, y: int, p: SPat($N)) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
+  if color == .BRICK {
+    return false
+  }
   for i in 1 ..< len(p.pat) do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   return true
 }
@@ -216,7 +238,7 @@ swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
   }
 }
 fill :: proc(b: ^Board) {
-  for &x in b.board do x = uniform_dist()
+  for &x in b.board do x = Tile(uniform_dist())
 }
 reasonable_coord :: proc(b: Board, i, j: int) -> bool {
   return i >= 0 && i < b.w && j >= 0 && j < b.h
@@ -228,6 +250,9 @@ remove_trios :: proc(b: ^Board) {
   defer delete(remove_j)
   for i in 0 ..< b.w {
     for j in 0 ..< b.h {
+      if at(b^, i, j) == .BRICK {
+        continue
+      }
       offset_i, offset_j := 1, 1
       for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) do offset_j += 1
       if offset_j > 2 do append(&remove_i, Triple{i, j, offset_j})
@@ -245,7 +270,7 @@ remove_trios :: proc(b: ^Board) {
       b.normals += max(0, b.normals - 1)
     }
     for jj in j ..< j + offset {
-      set_at(b, i, jj, 0)
+      set_at(b, i, jj)
       if is_magic(b^, i, jj) {
         b.score -= 3
         delete_key(&b.magic_tiles, Pair{i, jj})
@@ -258,7 +283,7 @@ remove_trios :: proc(b: ^Board) {
     }
     if offset == 5 {
       for i in 0 ..< b.w {
-        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^), 0)
+        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^))
         b.score += 1
       }
       b.longests += 1
@@ -275,7 +300,7 @@ remove_trios :: proc(b: ^Board) {
       b.normals = max(0, b.normals - 1)
     }
     for ii in i ..< i + offset {
-      set_at(b, ii, j, 0)
+      set_at(b, ii, j)
       if is_magic(b^, ii, j) {
         b.score -= 3
         delete_key(&b.magic_tiles, Pair{ii, j})
@@ -288,7 +313,7 @@ remove_trios :: proc(b: ^Board) {
     }
     if offset == 5 {
       for i in 0 ..< b.w {
-        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^), 0)
+        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^))
         b.score += 1
       }
       b.longests += 1
@@ -304,7 +329,7 @@ remove_trios :: proc(b: ^Board) {
         for m in -1 ..< 2 {
           for n in -1 ..< 2 {
             if reasonable_coord(b^, i1 + m, j1 + n) {
-              set_at(b, i1 + m, j1 + n, 0)
+              set_at(b, i1 + m, j1 + n)
               b.score += 1
             }
           }
@@ -319,11 +344,11 @@ fill_up :: proc(b: ^Board) {
   curr_i := -1
   for i in 0 ..< b.w {
     for j in 0 ..< b.h {
-      if at(b^, i, j) == 0 {
+      if at(b^, i, j) == .NONE {
         curr_i = i
-        for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == 0 do curr_i += 1
+        for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == .NONE do curr_i += 1
         for k := curr_i; k >= 0; k -= 1 {
-          if at(b^, k, j) != 0 {
+          if at(b^, k, j) != .NONE {
             set_at(b, curr_i, j, at(b^, k, j))
             if is_magic(b^, k, j) {
               delete_key(&b.magic_tiles, Pair{k, j})
@@ -337,7 +362,7 @@ fill_up :: proc(b: ^Board) {
           }
         }
         for k := curr_i; k >= 0; k -= 1 {
-          set_at(b, k, j, uniform_dist())
+          set_at(b, k, j, Tile(uniform_dist()))
           if coin() == 1 do b.magic_tiles[{k, j}] = {}
           if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
         }
@@ -385,8 +410,32 @@ zero :: proc(b: ^Board) {
   b.longests = 0
   b.crosses = 0
 }
-remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
-  res := make([dynamic]Triple)
+handle_magick :: proc(b: ^Board, i, j: int) {
+  if is_magic(b^, i, j) {
+    b.score -= 3
+    delete_key(&b.magic_tiles, Pair{i, j})
+  }
+  if is_magic2(b^, i, j) {
+    b.score += 3
+    delete_key(&b.magic_tiles2, Pair{i, j})
+  }
+}
+remove_tile :: proc(b: ^Board, i, j: int, res: ^[dynamic]IndexedTile) {
+  append(res, IndexedTile{i, j, at(b^, i, j)})
+  set_at(b, i, j)
+  handle_magick(b, i, j)
+  for k in -1 ..= 1 {
+    for l in -1 ..= 1 {
+      if k != l && reasonable_coord(b^, i + k, j + l) && at(b^, i + k, j + l) == .BRICK {
+        append(res, IndexedTile{i + k, j + l, at(b^, i + k, j + l)})
+        set_at(b, i + k, j + l)
+        handle_magick(b, i + k, j + l)
+      }
+    }
+  }
+}
+remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
+  res := make([dynamic]IndexedTile)
   if len(b.rm_i) != 0 {
     t := b.rm_i[len(b.rm_i) - 1]
     i, j, offset := t.first, t.second, t.third
@@ -397,17 +446,10 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
       b.normals = max(0, b.normals - 1)
     }
     for jj in j ..< j + offset {
-      append(&res, Triple{i, jj, at(b^, i, jj)})
-      set_at(b, i, jj, 0)
-      if is_magic(b^, i, jj) {
-        b.score -= 3
-        delete_key(&b.magic_tiles, Pair{i, jj})
+      if at(b^, i, jj) != .NONE {
+        remove_tile(b, i, jj, &res)
+        b.score += 1
       }
-      if is_magic2(b^, i, jj) {
-        b.score += 3
-        delete_key(&b.magic_tiles2, Pair{i, jj})
-      }
-      b.score += 1
     }
     if offset == 5 {
       r := make(map[Pair]struct {})
@@ -417,11 +459,10 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
         for {
           x = uniform_dist_2(b^)
           y = uniform_dist_3(b^)
-          if !({x, y} in r) do break
+          if !({x, y} in r) && at(b^, x, y) != .NONE do break
         }
         r[{x, y}] = {}
-        append(&res, Triple{x, y, at(b^, x, y)})
-        set_at(b, x, y, 0)
+        remove_tile(b, x, y, &res)
         b.score += 1
       }
       b.longests += 1
@@ -441,17 +482,10 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
       b.normals = max(0, b.normals - 1)
     }
     for ii in i ..< i + offset {
-      append(&res, Triple{ii, j, at(b^, ii, j)})
-      set_at(b, ii, j, 0)
-      if is_magic(b^, ii, j) {
-        b.score -= 3
-        delete_key(&b.magic_tiles, Pair{ii, j})
+      if at(b^, ii, j) != .NONE {
+        remove_tile(b, ii, j, &res)
+        b.score += 1
       }
-      if is_magic2(b^, ii, j) {
-        b.score += 3
-        delete_key(&b.magic_tiles2, Pair{ii, j})
-      }
-      b.score += 1
     }
     if offset == 5 {
       r := make(map[Pair]struct {})
@@ -461,11 +495,10 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
         for {
           x = uniform_dist_2(b^)
           y = uniform_dist_3(b^)
-          if !({x, y} in r) do break
+          if !({x, y} in r) && at(b^, x, y) != .NONE do break
         }
         r[{x, y}] = {}
-        append(&res, Triple{x, y, at(b^, x, y)})
-        set_at(b, x, y, 0)
+        remove_tile(b, x, y, &res)
         b.score += 1
       }
       b.longests += 1
@@ -480,9 +513,8 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]Triple {
     i, j := t.first, t.second
     for m in -2 ..< 3 {
       for n in -2 ..< 3 {
-        if reasonable_coord(b^, i + m, j + n) {
-          append(&res, Triple{i + m, j + n, at(b^, i + m, j + n)})
-          set_at(b, i + m, j + n, 0)
+        if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
+          remove_tile(b, i + m, j + n, &res)
           b.score += 1
         }
       }
@@ -502,6 +534,9 @@ prepare_removals :: proc(b: ^Board) {
   clear(&b.matched_threes)
   for i in 0 ..< b.w {
     for j in 0 ..< b.h {
+      if at(b^, i, j) == .BRICK {
+        continue
+      }
       offset_j, offset_i := 1, 1
       for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) do offset_j += 1
       if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
@@ -741,7 +776,7 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error 
   for i in 0 ..< g.board.w {
     for j in 0 ..< g.board.h {
       val := read_value(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
-      set_at(&g.board, i, j, val)
+      set_at(&g.board, i, j, Tile(val))
     }
   }
   mt := read_value(&r) or_return
@@ -795,7 +830,7 @@ attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
   swap(&g.board, row1, col1, row2, col2)
   prepare_removals(&g.board)
 }
-step_game :: proc(g: ^Game) -> (res: [dynamic]Triple) {
+step_game :: proc(g: ^Game) -> (res: [dynamic]IndexedTile) {
   if !has_removals(g.board) do prepare_removals(&g.board)
   if !has_removals(g.board) {
     if g.first_work {
@@ -952,23 +987,28 @@ main :: proc() {
           c: rl.Color
           s: int
           switch it.third {
-          case 1:
+          case .NONE:
+            continue
+          case .SQUARE:
             c = nonacid_colors ? rl.PINK : rl.RED
             s = 4
-          case 2:
+          case .CIRCLE:
             c = nonacid_colors ? rl.LIME : rl.GREEN
             s = 0
-          case 3:
+          case .HEXAGON:
             c = nonacid_colors ? rl.SKYBLUE : rl.BLUE
             s = 6
-          case 4:
+          case .TRIANGLE:
             c = nonacid_colors ? rl.GOLD : rl.ORANGE
             s = 3
-          case 5:
+          case .PENTAGON:
             c = nonacid_colors ? rl.PURPLE : rl.MAGENTA
             s = 5
-          case 6:
+          case .RHOMBUS:
             c = nonacid_colors ? rl.BEIGE : rl.YELLOW
+            s = 4
+          case .BRICK:
+            c = rl.BROWN
             s = 4
           }
           append(&flying, Particle{f32(dd()), f32(dd()), f32(dd()), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s})
@@ -991,18 +1031,22 @@ main :: proc() {
           rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.GRAY)
         }
         switch at(game.board, j, i) {
-        case 1:
+        case .NONE:
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2, 45, rl.BLACK)
+        case .SQUARE:
           rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
-        case 2:
+        case .CIRCLE:
           rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
-        case 3:
+        case .HEXAGON:
           rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
-        case 4:
+        case .TRIANGLE:
           rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
-        case 5:
+        case .PENTAGON:
           rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
-        case 6:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.BEIGE : rl.YELLOW)
+        case .RHOMBUS:
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
+        case .BRICK:
+          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.4, 45, nonacid_colors ? rl.BROWN : rl.BEIGE)
         }
         if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
         if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
