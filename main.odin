@@ -6,9 +6,7 @@ import "core:flags"
 import "core:fmt"
 import "core:hash"
 import "core:io"
-import "core:math"
 import "core:math/rand"
-import "core:mem"
 import "core:os"
 import "core:slice"
 import "core:strconv"
@@ -27,7 +25,7 @@ SPat :: struct($N: int) {
   h:             int,
 }
 Threes :: [24]SPat(3)
-Fours :: [8]SPat(4)
+Fours :: [16]SPat(4)
 Fives :: [16]SPat(5)
 shift_p :: proc(p: ^Pat($N)) {
   minX, minY := max(int), max(int)
@@ -84,8 +82,11 @@ threes_p :: proc() -> (res: [24]SPat(3)) {
   copy(res[16:], threes3[:])
   return
 }
-fours_p :: proc() -> [8]SPat(4) {
-  return generate_p(Pat(4){{{0, 0}, {1, 1}, {0, 2}, {0, 3}}})
+fours_p :: proc() -> (res: [16]SPat(4)) {
+  fours1, fours2 := generate_p(Pat(4){{{0, 0}, {1, 1}, {0, 2}, {0, 3}}}), generate_p(Pat(4){{{0, 0}, {0, 1}, {1, 1}, {2, 0}}})
+  copy(res[:], fours1[:])
+  copy(res[8:], fours2[:])
+  return
 }
 fives_p :: proc() -> (res: [16]SPat(5)) {
   fives1, fives2 := generate_p(Pat(5){{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}), generate_p(Pat(5){{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}})
@@ -111,13 +112,14 @@ Board :: struct {
   board:            [dynamic]Tile,
   w:                int,
   h:                int,
-  matched_patterns: map[Pair]struct {},
-  matched_threes:   map[Pair]struct {},
-  magic_tiles:      map[Pair]struct {},
-  magic_tiles2:     map[Pair]struct {},
+  matched_patterns: map[Pair]struct{},
+  matched_threes:   map[Pair]struct{},
+  magic_tiles:      map[Pair]struct{},
+  magic_tiles2:     map[Pair]struct{},
   rm_i:             [dynamic]Triple,
   rm_j:             [dynamic]Triple,
   rm_b:             [dynamic]Pair,
+  rm_s:             [dynamic]Pair,
   score:            int,
   normals:          int,
   longers:          int,
@@ -153,13 +155,14 @@ make_board :: proc(w, h: int) -> (b: Board) {
   b.w = w
   b.h = h
   b.board = make([dynamic]Tile, w * h)
-  b.matched_patterns = make(map[Pair]struct {})
-  b.matched_threes = make(map[Pair]struct {})
-  b.magic_tiles = make(map[Pair]struct {})
-  b.magic_tiles2 = make(map[Pair]struct {})
+  b.matched_patterns = make(map[Pair]struct{})
+  b.matched_threes = make(map[Pair]struct{})
+  b.magic_tiles = make(map[Pair]struct{})
+  b.magic_tiles2 = make(map[Pair]struct{})
   b.rm_i = make([dynamic]Triple)
   b.rm_j = make([dynamic]Triple)
   b.rm_b = make([dynamic]Pair)
+  b.rm_s = make([dynamic]Pair)
   return
 }
 delete_board :: proc(b: ^Board) {
@@ -171,9 +174,10 @@ delete_board :: proc(b: ^Board) {
   delete(b.rm_i)
   delete(b.rm_j)
   delete(b.rm_b)
+  delete(b.rm_s)
 }
-copy_set :: proc(m: map[Pair]struct {}) -> map[Pair]struct {} {
-  m1 := make(map[Pair]struct {}, len(m))
+copy_set :: proc(m: map[Pair]struct{}) -> map[Pair]struct{} {
+  m1 := make(map[Pair]struct{}, len(m))
   for k, _ in m do m1[k] = {}
   return m1
 }
@@ -282,7 +286,7 @@ remove_trios :: proc(b: ^Board) {
       b.score += 1
     }
     if offset == 5 {
-      for i in 0 ..< b.w {
+      for _ in 0 ..< b.w {
         set_at(b, uniform_dist_2(b^), uniform_dist_3(b^))
         b.score += 1
       }
@@ -312,7 +316,7 @@ remove_trios :: proc(b: ^Board) {
       b.score += 1
     }
     if offset == 5 {
-      for i in 0 ..< b.w {
+      for _ in 0 ..< b.w {
         set_at(b, uniform_dist_2(b^), uniform_dist_3(b^))
         b.score += 1
       }
@@ -452,9 +456,9 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       }
     }
     if offset == 5 {
-      r := make(map[Pair]struct {})
+      r := make(map[Pair]struct{})
       defer delete(r)
-      for i in 0 ..< b.w {
+      for _ in 0 ..< b.w {
         x, y: int
         for {
           x = uniform_dist_2(b^)
@@ -488,9 +492,9 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       }
     }
     if offset == 5 {
-      r := make(map[Pair]struct {})
+      r := make(map[Pair]struct{})
       defer delete(r)
-      for i in 0 ..< b.w {
+      for _ in 0 ..< b.w {
         x, y: int
         for {
           x = uniform_dist_2(b^)
@@ -524,12 +528,27 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
     pop(&b.rm_b)
     return res
   }
+  if len(b.rm_s) != 0 {
+    t := b.rm_s[len(b.rm_s) - 1]
+    i, j := t.first, t.second
+    for m in 0 ..= 1 {
+      for n in 0 ..= 1 {
+        if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
+          remove_tile(b, i + m, j + n, &res)
+          b.score += 1
+        }
+      }
+    }
+    pop(&b.rm_s)
+    return res
+  }
   return res
 }
 prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_i)
   clear(&b.rm_j)
   clear(&b.rm_b)
+  clear(&b.rm_s)
   clear(&b.matched_patterns)
   clear(&b.matched_threes)
   for i in 0 ..< b.w {
@@ -537,11 +556,13 @@ prepare_removals :: proc(b: ^Board) {
       if at(b^, i, j) == .BRICK {
         continue
       }
+      val := at(b^, i, j)
       offset_j, offset_i := 1, 1
-      for j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j) do offset_j += 1
+      for j + offset_j < b.h && val == at(b^, i, j + offset_j) do offset_j += 1
       if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
-      for i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j) do offset_i += 1
+      for i + offset_i < b.w && val == at(b^, i + offset_i, j) do offset_i += 1
       if offset_i > 2 do append(&b.rm_j, Triple{i, j, offset_i})
+      if i != b.w - 1 && j != b.h - 1 do if at(b^, i + 1, j) == val && at(b^, i, j + 1) == val && at(b^, i + 1, j + 1) == val do append(&b.rm_s, Pair{i, j})
     }
   }
   for i in 0 ..< len(b.rm_i) {
@@ -561,9 +582,12 @@ prepare_removals :: proc(b: ^Board) {
   slice.sort_by(b.rm_b[:], proc(a, b: Pair) -> bool {
     return a.first > b.first
   })
+  slice.sort_by(b.rm_s[:], proc(a, b: Pair) -> bool {
+    return a.first > b.first
+  })
 }
 has_removals :: proc(b: Board) -> bool {
-  return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b))
+  return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b) + len(b.rm_s))
 }
 LeaderboardRecord :: struct {
   name:  string,
@@ -573,11 +597,11 @@ Leaderboard :: distinct [dynamic]LeaderboardRecord
 delete_leaderboard :: proc(l: ^Leaderboard) {
   for lr in l do delete(lr.name)
 }
-ReadLeaderboard :: proc() -> (Leaderboard, bool) {
-  res := make(Leaderboard)
-  data, ok := os.read_entire_file("leaderboard.txt")
-  defer if ok do delete(data)
-  if ok {
+ReadLeaderboard :: proc() -> (res: Leaderboard, ok: bool) {
+  res = make(Leaderboard)
+  data, ok1 := os.read_entire_file("leaderboard.txt")
+  defer if ok1 do delete(data)
+  if ok1 {
     lines := strings.split_lines(string(data))
     defer delete(lines)
     m: u64 = 0
@@ -585,9 +609,9 @@ ReadLeaderboard :: proc() -> (Leaderboard, bool) {
       parts, err := strings.split(line, ";")
       defer if err == .None do delete(parts)
       if len(parts) == 3 {
-        lr := LeaderboardRecord{strings.clone(parts[0]), strconv.atoi(parts[1])}
-        h, ok := strconv.parse_u64(parts[2])
-        if !ok || !check_hash(lr, h + m) {
+        lr := LeaderboardRecord{strings.clone(parts[0]), strconv.parse_int(parts[1]) or_return}
+        h, ok2 := strconv.parse_u64(parts[2])
+        if !ok2 || !check_hash(lr, h + m) {
           delete(res)
           return nil, false
         }
@@ -617,9 +641,9 @@ DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
   rl.DrawRectangle(w / 4, h / 4, w / 2, h / 2, rl.WHITE)
   rl.DrawText("Leaderboard:", w / 4 + 10, start_y, 20, rl.BLACK)
   slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
-  offset := min(offset, len(leaderboard) - 1)
-  finish := min(offset + 9, len(leaderboard))
-  for i in offset ..< finish {
+  new_offset := min(offset, len(leaderboard) - 1)
+  finish := min(new_offset + 9, len(leaderboard))
+  for i in new_offset ..< finish {
     lr := leaderboard[i]
     text := fmt.ctprintf("%d. %s: %d", i, lr.name, lr.score, newline = true)
     start_y += 30
@@ -754,10 +778,14 @@ save_board :: proc(b: ^strings.Builder, board: Board) {
   for key, _ in board.magic_tiles2 do fmt.sbprintf(b, "%d %d ", key.first, key.second)
   fmt.sbprintf(b, "\n")
 }
-load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error {
-  read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, err: io.Error) {
+ShitPants :: union {
+  bool,
+  io.Error,
+}
+load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> ShitPants {
+  read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, err: ShitPants) {
     temp_s := bufio.reader_read_string(r, u8(delim), context.temp_allocator) or_return
-    return strconv.atoi(temp_s), nil
+    return strconv.parse_int(temp_s)
   }
   r: bufio.Reader
   bufio.reader_init(&r, os.stream_from_handle(h))
@@ -781,14 +809,14 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error 
   }
   mt := read_value(&r) or_return
   clear(&g.board.magic_tiles)
-  for i in 0 ..< mt {
+  for _ in 0 ..< mt {
     x := read_value(&r, ' ') or_return
     y := read_value(&r, ' ') or_return
     g.board.magic_tiles[{x, y}] = {}
   }
   mt = read_value(&r) or_return
   clear(&g.board.magic_tiles2)
-  for i in 0 ..< mt {
+  for _ in 0 ..< mt {
     x := read_value(&r, ' ') or_return
     y := read_value(&r, ' ') or_return
     g.board.magic_tiles2[{x, y}] = {}
@@ -798,7 +826,7 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> io.Error 
 }
 load :: proc(g: ^Game, auto_clear: bool = false) -> bool {
   handle, err := os.open("save.txt")
-  if err == 0 {
+  if err == nil {
     g.work_board = false
     err := load_game(g, handle, auto_clear)
     if err != nil do return false
@@ -890,16 +918,7 @@ check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
 }
 main :: proc() {
   when ODIN_DEBUG {
-    track: mem.Tracking_Allocator
-    mem.tracking_allocator_init(&track, context.allocator)
-    context.allocator = mem.tracking_allocator(&track)
-    defer {
-      if len(track.allocation_map) > 0 {
-        fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
-        for _, entry in track.allocation_map do fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
-      }
-      mem.tracking_allocator_destroy(&track)
-    }
+    debug_stuff()
   }
   Options :: struct {
     steps: int "args:name=steps",
@@ -1108,7 +1127,7 @@ main :: proc() {
       var^ += val
       return var^
     }
-    sound_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "SOUND", true)
+    draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "SOUND", true)
     particles_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "PARTICLES", particles)
     hints_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "HINTS", hints)
     acid_button := draw_button(&bm, {w - 210, h - inc(&start_y, 40)}, "NO ACID", nonacid_colors)
@@ -1265,3 +1284,4 @@ main :: proc() {
   rl.CloseWindow()
   rl.CloseAudioDevice()
 }
+
