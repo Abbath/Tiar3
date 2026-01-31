@@ -1,6 +1,7 @@
 #+feature dynamic-literals
 package main
 
+import "base:intrinsics"
 import "core:bufio"
 import "core:flags"
 import "core:fmt"
@@ -136,21 +137,11 @@ Tile :: enum {
   RHOMBUS,
   BRICK,
 }
-coin :: proc() -> int {
-  return rand.int_max(42) + 1
-}
-coin2 :: proc() -> int {
-  return rand.int_max(69) + 1
-}
-uniform_dist :: proc() -> int {
-  return rand.int_max(int(max(Tile))) + 1
-}
-uniform_dist_2 :: proc(b: Board) -> int {
-  return rand.int_max(b.w)
-}
-uniform_dist_3 :: proc(b: Board) -> int {
-  return rand.int_max(b.h)
-}
+coin :: proc() -> int {return rand.int_max(42) + 1}
+coin2 :: proc() -> int {return rand.int_max(69) + 1}
+uniform_dist :: proc() -> int {return rand.int_max(int(max(Tile))) + 1}
+uniform_dist_2 :: proc(b: Board) -> int {return rand.int_max(b.w)}
+uniform_dist_3 :: proc(b: Board) -> int {return rand.int_max(b.h)}
 make_board :: proc(w, h: int) -> (b: Board) {
   b.w = w
   b.h = h
@@ -194,32 +185,18 @@ copy_board :: proc(b: Board) -> Board {
   b1.crosses = b.crosses
   return b1
 }
-at :: proc(brd: Board, a, b: int) -> Tile {
-  return brd.board[a * brd.h + b]
-}
-set_at :: proc(brd: ^Board, a, b: int, v: Tile = .NONE) {
-  brd.board[a * brd.h + b] = v
-}
+at :: proc(brd: Board, a, b: int) -> Tile {return brd.board[a * brd.h + b]}
+set_at :: proc(brd: ^Board, a, b: int, v: Tile = .NONE) {brd.board[a * brd.h + b] = v}
 match_pattern :: proc(b: Board, x, y: int, p: SPat($N)) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
-  if color == .BRICK {
-    return false
-  }
+  if color == .BRICK do return false
   for i in 1 ..< len(p.pat) do if color != at(b, x + p.pat[i].x, y + p.pat[i].y) do return false
   return true
 }
-match_patterns :: proc(b: ^Board, patterns: [$M]SPat($N)) {
-  for sp in patterns do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}
-}
-is_matched :: proc(b: Board, x, y: int) -> bool {
-  return {x, y} in b.matched_patterns
-}
-is_magic :: proc(b: Board, x, y: int) -> bool {
-  return {x, y} in b.magic_tiles
-}
-is_magic2 :: proc(b: Board, x, y: int) -> bool {
-  return {x, y} in b.magic_tiles2
-}
+match_patterns :: proc(b: ^Board, patterns: [$M]SPat($N)) {for sp in patterns do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}}
+is_matched :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.matched_patterns}
+is_magic :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles}
+is_magic2 :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles2}
 swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
   tmp := at(b^, x1, y1)
   set_at(b, x1, y1, at(b^, x2, y2))
@@ -241,28 +218,20 @@ swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
     b.magic_tiles2[{x1, y1}] = {}
   }
 }
-fill :: proc(b: ^Board) {
-  for &x in b.board do x = Tile(uniform_dist())
-}
-reasonable_coord :: proc(b: Board, i, j: int) -> bool {
-  return i >= 0 && i < b.w && j >= 0 && j < b.h
-}
+fill :: proc(b: ^Board) {for &x in b.board do x = Tile(uniform_dist())}
+reasonable_coord :: proc(b: Board, i, j: int) -> bool {return i >= 0 && i < b.w && j >= 0 && j < b.h}
 remove_trios :: proc(b: ^Board) {
   remove_i := make([dynamic]Triple)
   defer delete(remove_i)
   remove_j := make([dynamic]Triple)
   defer delete(remove_j)
-  for i in 0 ..< b.w {
-    for j in 0 ..< b.h {
-      if at(b^, i, j) == .BRICK {
-        continue
-      }
-      offset_i, offset_j := 1, 1
-      for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) do offset_j += 1
-      if offset_j > 2 do append(&remove_i, Triple{i, j, offset_j})
-      for (i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j)) do offset_i += 1
-      if offset_i > 2 do append(&remove_j, Triple{i, j, offset_i})
-    }
+  for i in 0 ..< b.w do for j in 0 ..< b.h {
+    if at(b^, i, j) == .BRICK do continue
+    offset_i, offset_j := 1, 1
+    for (j + offset_j < b.h && at(b^, i, j) == at(b^, i, j + offset_j)) do offset_j += 1
+    if offset_j > 2 do append(&remove_i, Triple{i, j, offset_j})
+    for (i + offset_i < b.w && at(b^, i, j) == at(b^, i + offset_i, j)) do offset_i += 1
+    if offset_i > 2 do append(&remove_j, Triple{i, j, offset_i})
   }
   for t in remove_i {
     i, j, offset := t.first, t.second, t.third
@@ -324,53 +293,47 @@ remove_trios :: proc(b: ^Board) {
       b.normals = max(0, b.normals - 1)
     }
   }
-  for i in 0 ..< len(remove_i) {
-    for j in 0 ..< len(remove_j) {
-      t1, t2 := remove_i[i], remove_j[j]
-      i1, j1, o1 := t1.first, t1.second, t1.third
-      i2, j2, o2 := t2.first, t2.second, t2.third
-      if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
-        for m in -1 ..< 2 {
-          for n in -1 ..< 2 {
-            if reasonable_coord(b^, i1 + m, j1 + n) {
-              set_at(b, i1 + m, j1 + n)
-              b.score += 1
-            }
+  for i in 0 ..< len(remove_i) do for j in 0 ..< len(remove_j) {
+    t1, t2 := remove_i[i], remove_j[j]
+    i1, j1, o1 := t1.first, t1.second, t1.third
+    i2, j2, o2 := t2.first, t2.second, t2.third
+    if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
+      for m in -1 ..< 2 {
+        for n in -1 ..< 2 {
+          if reasonable_coord(b^, i1 + m, j1 + n) {
+            set_at(b, i1 + m, j1 + n)
+            b.score += 1
           }
         }
-        b.crosses += 1
-        b.normals = max(0, b.normals - 2)
       }
+      b.crosses += 1
+      b.normals = max(0, b.normals - 2)
     }
   }
 }
 fill_up :: proc(b: ^Board) {
   curr_i := -1
-  for i in 0 ..< b.w {
-    for j in 0 ..< b.h {
-      if at(b^, i, j) == .NONE {
-        curr_i = i
-        for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == .NONE do curr_i += 1
-        for k := curr_i; k >= 0; k -= 1 {
-          if at(b^, k, j) != .NONE {
-            set_at(b, curr_i, j, at(b^, k, j))
-            if is_magic(b^, k, j) {
-              delete_key(&b.magic_tiles, Pair{k, j})
-              b.magic_tiles[{curr_i, j}] = {}
-            }
-            if is_magic2(b^, k, j) {
-              delete_key(&b.magic_tiles2, Pair{k, j})
-              b.magic_tiles2[{curr_i, j}] = {}
-            }
-            curr_i -= 1
-          }
+  for i in 0 ..< b.w do for j in 0 ..< b.h do if at(b^, i, j) == .NONE {
+    curr_i = i
+    for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == .NONE do curr_i += 1
+    for k := curr_i; k >= 0; k -= 1 {
+      if at(b^, k, j) != .NONE {
+        set_at(b, curr_i, j, at(b^, k, j))
+        if is_magic(b^, k, j) {
+          delete_key(&b.magic_tiles, Pair{k, j})
+          b.magic_tiles[{curr_i, j}] = {}
         }
-        for k := curr_i; k >= 0; k -= 1 {
-          set_at(b, k, j, Tile(uniform_dist()))
-          if coin() == 1 do b.magic_tiles[{k, j}] = {}
-          if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
+        if is_magic2(b^, k, j) {
+          delete_key(&b.magic_tiles2, Pair{k, j})
+          b.magic_tiles2[{curr_i, j}] = {}
         }
+        curr_i -= 1
       }
+    }
+    for k := curr_i; k >= 0; k -= 1 {
+      set_at(b, k, j, Tile(uniform_dist()))
+      if coin() == 1 do b.magic_tiles[{k, j}] = {}
+      if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
     }
   }
 }
@@ -383,9 +346,7 @@ match_threes :: proc(b: ^Board, threes: Threes) {
   clear(&b.matched_threes)
   for sp in threes do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_threes[{i + p.x, j + p.y}] = {}
 }
-is_three :: proc(b: Board, i, j: int) -> bool {
-  return {i, j} in b.matched_threes
-}
+is_three :: proc(b: Board, i, j: int) -> bool {return {i, j} in b.matched_threes}
 stabilize :: proc(b: ^Board, threes: Threes, fours: Fours, fives: Fives) {
   for {
     old_board := copy_board(b^)
@@ -428,14 +389,10 @@ remove_tile :: proc(b: ^Board, i, j: int, res: ^[dynamic]IndexedTile) {
   append(res, IndexedTile{i, j, at(b^, i, j)})
   set_at(b, i, j)
   handle_magick(b, i, j)
-  for k in -1 ..= 1 {
-    for l in -1 ..= 1 {
-      if k != l && reasonable_coord(b^, i + k, j + l) && at(b^, i + k, j + l) == .BRICK {
-        append(res, IndexedTile{i + k, j + l, at(b^, i + k, j + l)})
-        set_at(b, i + k, j + l)
-        handle_magick(b, i + k, j + l)
-      }
-    }
+  for k in -1 ..= 1 do for l in -1 ..= 1 do if k != l && reasonable_coord(b^, i + k, j + l) && at(b^, i + k, j + l) == .BRICK {
+    append(res, IndexedTile{i + k, j + l, at(b^, i + k, j + l)})
+    set_at(b, i + k, j + l)
+    handle_magick(b, i + k, j + l)
   }
 }
 remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
@@ -449,11 +406,9 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
-    for jj in j ..< j + offset {
-      if at(b^, i, jj) != .NONE {
-        remove_tile(b, i, jj, &res)
-        b.score += 1
-      }
+    for jj in j ..< j + offset do if at(b^, i, jj) != .NONE {
+      remove_tile(b, i, jj, &res)
+      b.score += 1
     }
     if offset == 5 {
       r := make(map[Pair]struct{})
@@ -461,8 +416,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       for _ in 0 ..< b.w {
         x, y: int
         for {
-          x = uniform_dist_2(b^)
-          y = uniform_dist_3(b^)
+          x, y = uniform_dist_2(b^), uniform_dist_3(b^)
           if !({x, y} in r) && at(b^, x, y) != .NONE do break
         }
         r[{x, y}] = {}
@@ -485,11 +439,9 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
-    for ii in i ..< i + offset {
-      if at(b^, ii, j) != .NONE {
-        remove_tile(b, ii, j, &res)
-        b.score += 1
-      }
+    for ii in i ..< i + offset do if at(b^, ii, j) != .NONE {
+      remove_tile(b, ii, j, &res)
+      b.score += 1
     }
     if offset == 5 {
       r := make(map[Pair]struct{})
@@ -515,13 +467,9 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   if len(b.rm_b) != 0 {
     t := b.rm_b[len(b.rm_b) - 1]
     i, j := t.first, t.second
-    for m in -2 ..< 3 {
-      for n in -2 ..< 3 {
-        if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
-          remove_tile(b, i + m, j + n, &res)
-          b.score += 1
-        }
-      }
+    for m in -2 ..< 3 do for n in -2 ..< 3 do if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
+      remove_tile(b, i + m, j + n, &res)
+      b.score += 1
     }
     b.crosses += 1
     b.normals = max(0, b.normals - 2)
@@ -531,19 +479,16 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   if len(b.rm_s) != 0 {
     t := b.rm_s[len(b.rm_s) - 1]
     i, j := t.first, t.second
-    for m in 0 ..= 1 {
-      for n in 0 ..= 1 {
-        if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
-          remove_tile(b, i + m, j + n, &res)
-          b.score += 1
-        }
-      }
+    for m in 0 ..= 1 do for n in 0 ..= 1 do if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
+      remove_tile(b, i + m, j + n, &res)
+      b.score += 1
     }
     pop(&b.rm_s)
     return res
   }
   return res
 }
+sorter :: proc(a, b: $T) -> bool {return a.first > b.first}
 prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_i)
   clear(&b.rm_j)
@@ -551,52 +496,34 @@ prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_s)
   clear(&b.matched_patterns)
   clear(&b.matched_threes)
-  for i in 0 ..< b.w {
-    for j in 0 ..< b.h {
-      if at(b^, i, j) == .BRICK {
-        continue
-      }
-      val := at(b^, i, j)
-      offset_j, offset_i := 1, 1
-      for j + offset_j < b.h && val == at(b^, i, j + offset_j) do offset_j += 1
-      if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
-      for i + offset_i < b.w && val == at(b^, i + offset_i, j) do offset_i += 1
-      if offset_i > 2 do append(&b.rm_j, Triple{i, j, offset_i})
-      if i != b.w - 1 && j != b.h - 1 do if at(b^, i + 1, j) == val && at(b^, i, j + 1) == val && at(b^, i + 1, j + 1) == val do append(&b.rm_s, Pair{i, j})
-    }
+  for i in 0 ..< b.w do for j in 0 ..< b.h {
+    if at(b^, i, j) == .BRICK do continue
+    val := at(b^, i, j)
+    offset_j, offset_i := 1, 1
+    for j + offset_j < b.h && val == at(b^, i, j + offset_j) do offset_j += 1
+    if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
+    for i + offset_i < b.w && val == at(b^, i + offset_i, j) do offset_i += 1
+    if offset_i > 2 do append(&b.rm_j, Triple{i, j, offset_i})
+    if i != b.w - 1 && j != b.h - 1 do if at(b^, i + 1, j) == val && at(b^, i, j + 1) == val && at(b^, i + 1, j + 1) == val do append(&b.rm_s, Pair{i, j})
   }
-  for i in 0 ..< len(b.rm_i) {
-    for j in 0 ..< len(b.rm_j) {
-      t1, t2 := b.rm_i[i], b.rm_j[j]
-      i1, j1, o1 := t1.first, t1.second, t1.third
-      i2, j2, o2 := t2.first, t2.second, t2.third
-      if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) do append(&b.rm_b, Pair{i1, j2})
-    }
+  for i in 0 ..< len(b.rm_i) do for j in 0 ..< len(b.rm_j) {
+    t1, t2 := b.rm_i[i], b.rm_j[j]
+    i1, j1, o1 := t1.first, t1.second, t1.third
+    i2, j2, o2 := t2.first, t2.second, t2.third
+    if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) do append(&b.rm_b, Pair{i1, j2})
   }
-  slice.sort_by(b.rm_i[:], proc(a, b: Triple) -> bool {
-    return a.first > b.first
-  })
-  slice.sort_by(b.rm_j[:], proc(a, b: Triple) -> bool {
-    return a.first > b.first
-  })
-  slice.sort_by(b.rm_b[:], proc(a, b: Pair) -> bool {
-    return a.first > b.first
-  })
-  slice.sort_by(b.rm_s[:], proc(a, b: Pair) -> bool {
-    return a.first > b.first
-  })
+  slice.sort_by(b.rm_i[:], intrinsics.procedure_of(sorter(Triple{}, Triple{})))
+  slice.sort_by(b.rm_j[:], intrinsics.procedure_of(sorter(Triple{}, Triple{})))
+  slice.sort_by(b.rm_b[:], intrinsics.procedure_of(sorter(Pair{}, Pair{})))
+  slice.sort_by(b.rm_s[:], intrinsics.procedure_of(sorter(Pair{}, Pair{})))
 }
-has_removals :: proc(b: Board) -> bool {
-  return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b) + len(b.rm_s))
-}
+has_removals :: proc(b: Board) -> bool {return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b) + len(b.rm_s))}
 LeaderboardRecord :: struct {
   name:  string,
   score: int,
 }
 Leaderboard :: distinct [dynamic]LeaderboardRecord
-delete_leaderboard :: proc(l: ^Leaderboard) {
-  for lr in l do delete(lr.name)
-}
+delete_leaderboard :: proc(l: ^Leaderboard) {for lr in l do delete(lr.name)}
 ReadLeaderboard :: proc() -> (res: Leaderboard, ok: bool) {
   res = make(Leaderboard)
   data, ok1 := os.read_entire_file("leaderboard.txt")
@@ -670,9 +597,7 @@ Button :: struct {
   x2: f32,
   y2: f32,
 }
-in_button :: proc(pos: rl.Vector2, button: Button) -> bool {
-  return pos.x > button.x1 && pos.x < button.x2 && pos.y > button.y1 && pos.y < button.y2
-}
+in_button :: proc(pos: rl.Vector2, button: Button) -> bool {return pos.x > button.x1 && pos.x < button.x2 && pos.y > button.y1 && pos.y < button.y2}
 button_maker_enter := true
 ButtonMaker :: struct {
   play_sound: bool,
@@ -680,9 +605,7 @@ ButtonMaker :: struct {
   volume:     f32,
   buttons:    [dynamic]Button,
 }
-delete_button_maker :: proc(bm: ^ButtonMaker) {
-  delete(bm.buttons)
-}
+delete_button_maker :: proc(bm: ^ButtonMaker) {delete(bm.buttons)}
 draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool) -> Button {
   button_down := rl.IsMouseButtonDown(rl.MouseButton.LEFT)
   pos := rl.GetMousePosition()
@@ -697,18 +620,14 @@ draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool
         x := rl.GetMouseX()
         bm.volume = f32(x - place.x) / 200.0
       }
-    } else {
-      rl.DrawRectangle(place.x, place.y, 200, 30, c)
-    }
+    } else do rl.DrawRectangle(place.x, place.y, 200, 30, c)
   } else {
     c := enabled ? rl.GOLD : rl.GRAY
     if text == "SOUND" {
       level := bm.volume * 200
       rl.DrawRectangle(place.x, place.y, i32(level), 30, rl.GOLD)
       rl.DrawRectangle(place.x + i32(level), place.y, i32(200 - level), 30, rl.GRAY)
-    } else {
-      rl.DrawRectangle(place.x, place.y, 200, 30, c)
-    }
+    } else do rl.DrawRectangle(place.x, place.y, 200, 30, c)
   }
   label := text == "SOUND" ? fmt.ctprintf("SOUND (%d)", int(bm.volume * 100)) : fmt.ctprintf("%s", text)
   width := rl.MeasureText(label, 20)
@@ -801,11 +720,9 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> ShitPants
   g.board.w = read_value(&r, ' ') or_return
   g.board.h = read_value(&r) or_return
   resize(&g.board.board, g.board.w * g.board.h)
-  for i in 0 ..< g.board.w {
-    for j in 0 ..< g.board.h {
-      val := read_value(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
-      set_at(&g.board, i, j, Tile(val))
-    }
+  for i in 0 ..< g.board.w do for j in 0 ..< g.board.h {
+    val := read_value(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
+    set_at(&g.board, i, j, Tile(val))
   }
   mt := read_value(&r) or_return
   clear(&g.board.magic_tiles)
@@ -839,9 +756,7 @@ save_state :: proc(g: ^Game) {
   delete_board(&g.old_board)
   g.old_board = copy_board(g.board)
 }
-check_state :: proc(g: Game) -> bool {
-  return compare_boards(g.old_board, g.board)
-}
+check_state :: proc(g: Game) -> bool {return compare_boards(g.old_board, g.board)}
 restore_state :: proc(g: ^Game) {
   delete_board(&g.board)
   g.board = copy_board(g.old_board)
@@ -861,11 +776,8 @@ attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
 step_game :: proc(g: ^Game) -> (res: [dynamic]IndexedTile) {
   if !has_removals(g.board) do prepare_removals(&g.board)
   if !has_removals(g.board) {
-    if g.first_work {
-      restore_state(g)
-    } else {
-      g.counter += 1
-    }
+    if g.first_work do restore_state(g)
+    else do g.counter += 1
     g.work_board = false
     match(g)
   }
@@ -874,15 +786,9 @@ step_game :: proc(g: ^Game) -> (res: [dynamic]IndexedTile) {
   g.first_work = false
   return
 }
-is_finished :: proc(g: Game, max_steps: int = 50) -> bool {
-  return g.counter == max_steps
-}
-is_processing :: proc(g: Game) -> bool {
-  return g.work_board
-}
-game_stats :: proc(g: Game) -> string {
-  return fmt.tprintf("Moves: %d\nScore: %d\nTrios: %d\nQuartets: %d\nQuintets: %d\nCrosses: %d", g.counter, g.board.score, g.board.normals, g.board.longers, g.board.longests, g.board.crosses)
-}
+is_finished :: proc(g: Game, max_steps: int = 50) -> bool {return g.counter == max_steps}
+is_processing :: proc(g: Game) -> bool {return g.work_board}
+game_stats :: proc(g: Game) -> string {return fmt.tprintf("Moves: %d\nScore: %d\nTrios: %d\nQuartets: %d\nQuintets: %d\nCrosses: %d", g.counter, g.board.score, g.board.normals, g.board.longers, g.board.longests, g.board.crosses)}
 Particle :: struct {
   dx:       f32,
   dy:       f32,
@@ -899,9 +805,7 @@ Explosion :: struct {
   y:        int,
   lifetime: int,
 }
-button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {
-  if in_button(pos, button) do flag^ = !flag^
-}
+button_flag :: proc(pos: rl.Vector2, button: Button, flag: ^bool) {if in_button(pos, button) do flag^ = !flag^}
 compute_hash :: proc(lr: LeaderboardRecord, m: u64) -> (n: u64) {
   for {
     n = rand.uint64()
@@ -917,9 +821,7 @@ check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
   return hash.crc64_iso_3306(transmute([]byte)str) & 0xff == 0
 }
 main :: proc() {
-  when ODIN_DEBUG {
-    debug_stuff()
-  }
+  when ODIN_DEBUG do debug_stuff()
   Options :: struct {
     steps: int "args:name=steps",
     score: int "args:name=score",
@@ -977,17 +879,12 @@ main :: proc() {
   rl.SetTargetFPS(60)
   for !rl.WindowShouldClose() {
     rl.SetMasterVolume(volume)
-    if frame_counter == 60 {
-      frame_counter = 0
-    } else {
-      frame_counter += 1
-    }
-    w = rl.GetRenderWidth()
-    h = rl.GetRenderHeight()
+    if frame_counter == 60 do frame_counter = 0
+    else do frame_counter += 1
+    w, h = rl.GetRenderWidth(), rl.GetRenderHeight()
     s: i32 = w > h ? h : w
     margin: i32 = 10
-    board_x := w / 2 - s / 2 + margin
-    board_y := h / 2 - s / 2 + margin
+    board_x, board_y := w / 2 - s / 2 + margin, h / 2 - s / 2 + margin
     ss := (s - 2 * margin) / i32(board_size)
     so: i32 = 2
     mo: f32 = 0.5
@@ -1038,38 +935,36 @@ main :: proc() {
     rl.BeginDrawing()
     rl.ClearBackground(rl.RAYWHITE)
     rl.DrawRectangle(board_x, board_y, ss * i32(board_size), ss * i32(board_size), rl.BLACK)
-    for i in 0 ..< board_size {
-      for j in 0 ..< board_size {
-        pos_x, pos_y := board_x + i32(i) * ss + so, board_y + i32(j) * ss + so
-        radius := (ss - 2 * so) / 2
-        if is_matched(game.board, j, i) && hints {
-          rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.DARKGRAY)
-        } else if is_three(game.board, j, i) && hints {
-          rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.LIGHTGRAY)
-        } else {
-          rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.GRAY)
-        }
-        switch at(game.board, j, i) {
-        case .NONE:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2, 45, rl.BLACK)
-        case .SQUARE:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
-        case .CIRCLE:
-          rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
-        case .HEXAGON:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
-        case .TRIANGLE:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
-        case .PENTAGON:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
-        case .RHOMBUS:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
-        case .BRICK:
-          rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.4, 45, nonacid_colors ? rl.BROWN : rl.BEIGE)
-        }
-        if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
-        if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
+    for i in 0 ..< board_size do for j in 0 ..< board_size {
+      pos_x, pos_y := board_x + i32(i) * ss + so, board_y + i32(j) * ss + so
+      radius := (ss - 2 * so) / 2
+      if is_matched(game.board, j, i) && hints {
+        rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.DARKGRAY)
+      } else if is_three(game.board, j, i) && hints {
+        rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.LIGHTGRAY)
+      } else {
+        rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.GRAY)
       }
+      switch at(game.board, j, i) {
+      case .NONE:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2, 45, rl.BLACK)
+      case .SQUARE:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
+      case .CIRCLE:
+        rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
+      case .HEXAGON:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
+      case .TRIANGLE:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
+      case .PENTAGON:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
+      case .RHOMBUS:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
+      case .BRICK:
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.4, 45, nonacid_colors ? rl.BROWN : rl.BEIGE)
+      }
+      if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
+      if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
     }
     if !first_click {
       pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
@@ -1083,11 +978,8 @@ main :: proc() {
           rl.DrawPoly({f32(pos_x + radius + (dx == 1 ? ss / 2 : 0)), f32(pos_y + radius + (dy == 1 ? ss / 2 : 0))}, 3, f32(radius) - mo, dx == 1 ? 0 : 90, rl.MAROON)
         }
         if dx == -1 && dy == 0 || dx == 0 && dy == -1 {
-          if dx == -1 {
-            rl.DrawRectangleGradientH(pos_x + radius - (dx == -1 ? ss / 2 - 10 : 0), pos_y + radius - (dy == -1 ? ss / 2 : 10), dx == -1 ? ss / 2 : 20, dy == -1 ? ss / 2 + 10 : 20, rl.MAROON, rl.BLANK)
-          } else {
-            rl.DrawRectangleGradientV(pos_x + radius - (dx == -1 ? ss / 2 : 10), pos_y + radius - (dy == -1 ? ss / 2 - 10 : 0), dx == -1 ? ss / 2 + 10 : 20, dy == -1 ? ss / 2 : 20, rl.MAROON, rl.BLANK)
-          }
+          if dx == -1 do rl.DrawRectangleGradientH(pos_x + radius - (dx == -1 ? ss / 2 - 10 : 0), pos_y + radius - (dy == -1 ? ss / 2 : 10), dx == -1 ? ss / 2 : 20, dy == -1 ? ss / 2 + 10 : 20, rl.MAROON, rl.BLANK)
+          else do rl.DrawRectangleGradientV(pos_x + radius - (dx == -1 ? ss / 2 : 10), pos_y + radius - (dy == -1 ? ss / 2 - 10 : 0), dx == -1 ? ss / 2 + 10 : 20, dy == -1 ? ss / 2 : 20, rl.MAROON, rl.BLANK)
           rl.DrawPoly({f32(pos_x + radius - (dx == -1 ? ss / 2 : 0)), f32(pos_y + radius - (dy == -1 ? ss / 2 : 0))}, 3, f32(radius) - mo, dx == -1 ? 180 : 270, rl.MAROON)
         }
       }
@@ -1159,11 +1051,8 @@ main :: proc() {
         p := it
         c := p.color
         c.a = u8(255 - p.lifetime)
-        if p.sides == 0 {
-          rl.DrawCircle(i32(p.x), i32(p.y), f32(ss / 2), c)
-        } else {
-          rl.DrawPoly({f32(p.x), f32(p.y)}, i32(p.sides), f32(ss / 2), p.a, c)
-        }
+        if p.sides == 0 do rl.DrawCircle(i32(p.x), i32(p.y), f32(ss / 2), c)
+        else do rl.DrawPoly({f32(p.x), f32(p.y)}, i32(p.sides), f32(ss / 2), p.a, c)
         p.y += p.dy
         if p.y > f32(h) || p.x < 0 || p.x > f32(w) || p.lifetime > 254 do continue
         p.x += p.dx
@@ -1178,40 +1067,38 @@ main :: proc() {
     }
     rl.EndDrawing()
     outside: {
-      if !input_name && !is_processing(game) {
-        if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-          pos := rl.GetMousePosition()
-          button_flag(pos, particles_button, &particles)
-          button_flag(pos, hints_button, &hints)
-          button_flag(pos, acid_button, &nonacid_colors)
-          button_flag(pos, lbutton, &draw_leaderboard)
-          if in_button(pos, rbutton) {
-            new_game(&game)
-            input_name = true
-          }
-          if in_button(pos, load_button) do load(&game)
-          if in_button(pos, save_button) do save(game)
-          if draw_leaderboard do break outside
-          pos = pos - {f32(board_x), f32(board_y)}
-          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
-          row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
-          if first_click {
-            saved_row = row
-            saved_col = col
-            first_click = false
-          } else {
+      if !input_name && !is_processing(game) do if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+        pos := rl.GetMousePosition()
+        button_flag(pos, particles_button, &particles)
+        button_flag(pos, hints_button, &hints)
+        button_flag(pos, acid_button, &nonacid_colors)
+        button_flag(pos, lbutton, &draw_leaderboard)
+        if in_button(pos, rbutton) {
+          new_game(&game)
+          input_name = true
+        }
+        if in_button(pos, load_button) do load(&game)
+        if in_button(pos, save_button) do save(game)
+        if draw_leaderboard do break outside
+        pos = pos - {f32(board_x), f32(board_y)}
+        if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
+        row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
+        if first_click {
+          saved_row = row
+          saved_col = col
+          first_click = false
+        } else {
+          first_click = true
+          if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
+        }
+      } else if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
+        pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
+        if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
+        row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
+        if row != saved_row || col != saved_col {
+          if !first_click {
             first_click = true
             if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
-          }
-        } else if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
-          pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
-          if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
-          row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
-          if row != saved_row || col != saved_col {
-            if !first_click {
-              first_click = true
-              if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
-            }
           }
         }
       }
@@ -1219,11 +1106,8 @@ main :: proc() {
     if rl.IsKeyPressed(.ENTER) && input_name {
       input_name = false
       delete(game.name)
-      if len(strings.to_string(builder)) == 0 {
-        game.name = strings.clone("dupa")
-      } else {
-        game.name = strings.clone(strings.to_string(builder))
-      }
+      if len(strings.to_string(builder)) == 0 do game.name = strings.clone("dupa")
+      else do game.name = strings.clone(strings.to_string(builder))
     } else if rl.IsKeyPressed(.BACKSPACE) {
       strings.pop_rune(&builder)
     } else if !input_name {
@@ -1255,13 +1139,11 @@ main :: proc() {
       }
     }
     if is_finished(game, opts.steps) {
-      for lr, idx in leaderboard {
-        if lr.score < game.board.score {
-          inject_at(&leaderboard, idx, LeaderboardRecord{strings.clone(game.name), game.board.score})
-          leaderboard_place = idx
-          l_offset = max(0, idx - 4)
-          break
-        }
+      for lr, idx in leaderboard do if lr.score < game.board.score {
+        inject_at(&leaderboard, idx, LeaderboardRecord{strings.clone(game.name), game.board.score})
+        leaderboard_place = idx
+        l_offset = max(0, idx - 4)
+        break
       }
       if leaderboard_place == -1 {
         leaderboard_place = len(leaderboard)
