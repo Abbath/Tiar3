@@ -489,6 +489,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   return res
 }
 sorter :: proc(a, b: $T) -> bool {return a.first > b.first}
+sorter_factory :: proc($T: typeid) -> proc(_: T, _: T) -> bool {return intrinsics.procedure_of(sorter(T{}, T{}))}
 prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_i)
   clear(&b.rm_j)
@@ -512,10 +513,10 @@ prepare_removals :: proc(b: ^Board) {
     i2, j2, o2 := t2.first, t2.second, t2.third
     if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) do append(&b.rm_b, Pair{i1, j2})
   }
-  slice.sort_by(b.rm_i[:], intrinsics.procedure_of(sorter(Triple{}, Triple{})))
-  slice.sort_by(b.rm_j[:], intrinsics.procedure_of(sorter(Triple{}, Triple{})))
-  slice.sort_by(b.rm_b[:], intrinsics.procedure_of(sorter(Pair{}, Pair{})))
-  slice.sort_by(b.rm_s[:], intrinsics.procedure_of(sorter(Pair{}, Pair{})))
+  slice.sort_by(b.rm_i[:], sorter_factory(Triple))
+  slice.sort_by(b.rm_j[:], sorter_factory(Triple))
+  slice.sort_by(b.rm_b[:], sorter_factory(Pair))
+  slice.sort_by(b.rm_s[:], sorter_factory(Pair))
 }
 has_removals :: proc(b: Board) -> bool {return bool(len(b.rm_i) + len(b.rm_j) + len(b.rm_b) + len(b.rm_s))}
 LeaderboardRecord :: struct {
@@ -885,7 +886,7 @@ main :: proc() {
     s: i32 = w > h ? h : w
     margin: i32 = 10
     board_x, board_y := w / 2 - s / 2 + margin, h / 2 - s / 2 + margin
-    ss := (s - 2 * margin) / i32(board_size)
+    ss := (s - 2 * margin) / auto_cast board_size
     so: i32 = 2
     mo: f32 = 0.5
     if is_processing(game) && frame_counter % 6 == 0 {
@@ -894,8 +895,8 @@ main :: proc() {
       if is_play_sound && len(f) != 0 && rl.IsSoundReady(psound) do rl.PlaySound(psound)
       if particles {
         if is_play_sound && len(f) != 0 {
-          board_x += i32(dd())
-          board_y += i32(dd())
+          board_x += auto_cast dd()
+          board_y += auto_cast dd()
         }
         reserve(&flying, len(flying) + len(f))
         reserve(&staying, len(staying) + len(f))
