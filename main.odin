@@ -766,11 +766,11 @@ match :: proc(g: ^Game) {
   match_patterns(&g.board, g.fives)
   match_threes(&g.board, g.threes)
 }
-attempt_move :: proc(g: ^Game, row1, col1, row2, col2: int) {
+attempt_move :: proc(g: ^Game, row1, col1, row2, col2: $T) {
   g.first_work = true
   g.work_board = true
   save_state(g)
-  swap(&g.board, row1, col1, row2, col2)
+  swap(&g.board, int(row1), int(col1), int(row2), int(col2))
   prepare_removals(&g.board)
 }
 step_game :: proc(g: ^Game) -> (res: [dynamic]IndexedTile) {
@@ -927,16 +927,16 @@ main :: proc() {
             c = rl.BROWN
             s = 4
           }
-          append(&flying, Particle{f32(dd()), f32(dd()), f32(dd()), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s})
+          append(&flying, Particle{auto_cast dd(), auto_cast dd(), auto_cast dd(), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s})
           append(&staying, Explosion{it.second, it.first, 0})
         }
       }
     }
     rl.BeginDrawing()
     rl.ClearBackground(rl.RAYWHITE)
-    rl.DrawRectangle(board_x, board_y, ss * i32(board_size), ss * i32(board_size), rl.BLACK)
+    rl.DrawRectangle(board_x, board_y, ss * auto_cast board_size, ss * auto_cast board_size, rl.BLACK)
     for i in 0 ..< board_size do for j in 0 ..< board_size {
-      pos_x, pos_y := board_x + i32(i) * ss + so, board_y + i32(j) * ss + so
+      pos_x, pos_y := board_x + auto_cast i * ss + so, board_y + auto_cast j * ss + so
       radius := (ss - 2 * so) / 2
       if is_matched(game.board, j, i) && hints {
         rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.DARKGRAY)
@@ -955,9 +955,9 @@ main :: proc() {
       case .HEXAGON:
         rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
       case .TRIANGLE:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
       case .PENTAGON:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
       case .RHOMBUS:
         rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
       case .BRICK:
@@ -968,8 +968,8 @@ main :: proc() {
     }
     if !first_click {
       pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
-      if !(pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size))) {
-        row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
+      if !(pos.x < 0 || pos.y < 0 || pos.x > f32(ss * auto_cast board_size) || pos.y > f32(ss * auto_cast board_size)) {
+        row, col := i32(pos.y / auto_cast ss), i32(pos.x / auto_cast ss)
         dx, dy := col - saved_col, row - saved_row
         radius := (ss - 2 * so) / 2
         pos_x, pos_y := board_x + saved_col * ss + so, board_y + saved_row * ss + so
@@ -1051,10 +1051,10 @@ main :: proc() {
         p := it
         c := p.color
         c.a = u8(255 - p.lifetime)
-        if p.sides == 0 do rl.DrawCircle(i32(p.x), i32(p.y), f32(ss / 2), c)
-        else do rl.DrawPoly({f32(p.x), f32(p.y)}, i32(p.sides), f32(ss / 2), p.a, c)
+        if p.sides == 0 do rl.DrawCircle(auto_cast p.x, auto_cast p.y, auto_cast ss / 2, c)
+        else do rl.DrawPoly({auto_cast p.x, auto_cast p.y}, auto_cast p.sides, auto_cast ss / 2, p.a, c)
         p.y += p.dy
-        if p.y > f32(h) || p.x < 0 || p.x > f32(w) || p.lifetime > 254 do continue
+        if p.y > auto_cast h || p.x < 0 || p.x > auto_cast w || p.lifetime > 254 do continue
         p.x += p.dx
         p.a += p.da
         p.dy += 1
@@ -1080,16 +1080,16 @@ main :: proc() {
         if in_button(pos, load_button) do load(&game)
         if in_button(pos, save_button) do save(game)
         if draw_leaderboard do break outside
-        pos = pos - {f32(board_x), f32(board_y)}
-        if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
-        row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
+        pos = pos - {auto_cast board_x, auto_cast board_y}
+        if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * auto_cast board_size) || pos.y > f32(ss * auto_cast board_size) do break outside
+        row, col := i32(pos.y / auto_cast ss), i32(pos.x / auto_cast ss)
         if first_click {
           saved_row = row
           saved_col = col
           first_click = false
         } else {
           first_click = true
-          if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
+          if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, row, col, saved_row, saved_col)
         }
       } else if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
         pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
@@ -1098,7 +1098,7 @@ main :: proc() {
         if row != saved_row || col != saved_col {
           if !first_click {
             first_click = true
-            if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, int(row), int(col), int(saved_row), int(saved_col))
+            if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, row, col, saved_row, saved_col)
           }
         }
       }
