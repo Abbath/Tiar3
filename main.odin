@@ -955,9 +955,9 @@ main :: proc() {
       case .HEXAGON:
         rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
       case .TRIANGLE:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
       case .PENTAGON:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
+        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
       case .RHOMBUS:
         rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
       case .BRICK:
