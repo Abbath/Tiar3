@@ -702,9 +702,10 @@ ShitPants :: union {
   io.Error,
 }
 load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> ShitPants {
-  read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, err: ShitPants) {
-    temp_s := bufio.reader_read_string(r, u8(delim), context.temp_allocator) or_return
-    return strconv.parse_int(temp_s)
+  read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, ok: bool) {
+    temp_s, err := bufio.reader_read_string(r, u8(delim), context.temp_allocator)
+    if err != .None do return 0, false
+    return strconv.parse_int(strings.trim_space(temp_s))
   }
   r: bufio.Reader
   bufio.reader_init(&r, os.stream_from_handle(h))
@@ -726,27 +727,28 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> ShitPants
   }
   mt := read_value(&r) or_return
   clear(&g.board.magic_tiles)
-  for _ in 0 ..< mt {
+  for i in 0 ..< mt {
     x := read_value(&r, ' ') or_return
-    y := read_value(&r, ' ') or_return
+    y := read_value(&r, i == mt - 1 ? '\n' : ' ') or_return
     g.board.magic_tiles[{x, y}] = {}
   }
   mt = read_value(&r) or_return
   clear(&g.board.magic_tiles2)
-  for _ in 0 ..< mt {
+  for i in 0 ..< mt {
     x := read_value(&r, ' ') or_return
-    y := read_value(&r, ' ') or_return
+    y := read_value(&r, i == mt - 1 ? '\n' : ' ') or_return
     g.board.magic_tiles2[{x, y}] = {}
   }
   if auto_clear do free_all(context.temp_allocator)
-  return nil
+  return true
 }
 load :: proc(g: ^Game, auto_clear: bool = false) -> bool {
   handle, err := os.open("save.txt")
   if err == nil {
     g.work_board = false
     err := load_game(g, handle, auto_clear)
-    if err != nil do return false
+    fmt.println(err.(bool))
+    if err != true do return false
     match(g)
     return true
   }
