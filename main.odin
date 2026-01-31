@@ -488,8 +488,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   }
   return res
 }
-sorter :: proc(a, b: $T) -> bool {return a.first > b.first}
-sorter_factory :: proc($T: typeid) -> proc(_: T, _: T) -> bool {return intrinsics.procedure_of(sorter(T{}, T{}))}
+sorter_factory :: proc($T: typeid) -> proc(_: T, _: T) -> bool {return proc(a, b: T) -> bool {return a.first < b.first}}
 prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_i)
   clear(&b.rm_j)
