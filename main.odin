@@ -139,7 +139,7 @@ Tile :: enum {
 }
 coin :: proc() -> int {return rand.int_max(42) + 1}
 coin2 :: proc() -> int {return rand.int_max(69) + 1}
-uniform_dist :: proc() -> int {return rand.int_max(int(max(Tile))) + 1}
+uniform_dist :: proc() -> int {return rand.int_max(len(Tile)) + 1}
 uniform_dist_2 :: proc(b: Board) -> int {return rand.int_max(b.w)}
 uniform_dist_3 :: proc(b: Board) -> int {return rand.int_max(b.h)}
 make_board :: proc(w, h: int) -> (b: Board) {
@@ -526,9 +526,9 @@ Leaderboard :: distinct [dynamic]LeaderboardRecord
 delete_leaderboard :: proc(l: ^Leaderboard) {for lr in l do delete(lr.name)}
 ReadLeaderboard :: proc() -> (res: Leaderboard, ok: bool) {
   res = make(Leaderboard)
-  data, ok1 := os.read_entire_file("leaderboard.txt")
-  defer if ok1 do delete(data)
-  if ok1 {
+  data, ok1 := os.read_entire_file("leaderboard.txt", context.allocator)
+  defer if ok1 == nil do delete(data)
+  if ok1 == nil {
     lines := strings.split_lines(string(data))
     defer delete(lines)
     m: u64 = 0
@@ -559,7 +559,7 @@ WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
     m = compute_hash(lr, m)
     fmt.sbprintf(&builder, "%s;%d;%d", lr.name, lr.score, m, newline = true)
   }
-  os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
+  _ = os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
 }
 DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
   if len(leaderboard) == 0 do return
@@ -682,7 +682,7 @@ save :: proc(g: Game, auto_clean: bool = false) {
   builder := strings.builder_make(context.temp_allocator)
   fmt.sbprintf(&builder, "%s %d\n", g.name, g.counter)
   save_board(&builder, g.board)
-  os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
+  _ = os.write_entire_file("save.txt", transmute([]u8)strings.to_string(builder))
   if auto_clean do free_all(context.temp_allocator)
 }
 save_board :: proc(b: ^strings.Builder, board: Board) {
@@ -701,14 +701,14 @@ ShitPants :: union {
   bool,
   io.Error,
 }
-load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> ShitPants {
+load_game :: proc(g: ^Game, h: ^os.File, auto_clear: bool = false) -> ShitPants {
   read_value :: proc(r: ^bufio.Reader, delim: rune = '\n') -> (val: int, ok: bool) {
     temp_s, err := bufio.reader_read_string(r, u8(delim), context.temp_allocator)
     if err != .None do return 0, false
     return strconv.parse_int(strings.trim_space(temp_s))
   }
   r: bufio.Reader
-  bufio.reader_init(&r, os.stream_from_handle(h))
+  bufio.reader_init(&r, os.to_stream(h))
   defer bufio.reader_destroy(&r)
   name_tmp := bufio.reader_read_string(&r, ' ', context.temp_allocator) or_return
   g.name = strings.clone(name_tmp)
@@ -743,10 +743,10 @@ load_game :: proc(g: ^Game, h: os.Handle, auto_clear: bool = false) -> ShitPants
   return true
 }
 load :: proc(g: ^Game, auto_clear: bool = false) -> bool {
-  handle, err := os.open("save.txt")
+  file, err := os.open("save.txt")
   if err == nil {
     g.work_board = false
-    err := load_game(g, handle, auto_clear)
+    err := load_game(g, file, auto_clear)
     fmt.println(err.(bool))
     if err != true do return false
     match(g)
