@@ -138,7 +138,7 @@ Tile :: enum {
 }
 coin :: proc() -> int {return rand.int_max(42) + 1}
 coin2 :: proc() -> int {return rand.int_max(69) + 1}
-uniform_dist :: proc() -> int {return rand.int_max(len(Tile)) + 1}
+uniform_dist :: proc() -> int {return rand.int_max(len(Tile) - 1) + 1}
 uniform_dist_2 :: proc(b: Board) -> int {return rand.int_max(b.w)}
 uniform_dist_3 :: proc(b: Board) -> int {return rand.int_max(b.h)}
 make_board :: proc(w, h: int) -> (b: Board) {
