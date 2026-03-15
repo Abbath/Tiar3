@@ -66,33 +66,32 @@ sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   res.h = maxY + 1
   return
 }
+copy_into :: proc(res: $T/[]$E, slices: []T) {
+  offset := 0
+  for s in slices do offset += copy(res[offset:], s)
+}
 generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
   s := rotations_p(p)
   m := mirrored_p(p)
   r := rotations_p(m)
   res1: [8]Pat(N)
-  copy(res1[:], r[:])
-  copy(res1[4:], s[:])
+  copy_into(res1[:], [][]Pat(N){r[:], s[:]})
   for i in 0 ..< 8 do res2[i] = sized_p(res1[i])
   return
 }
 threes_p :: proc() -> (res: [24]SPat(3)) {
   threes1, threes2, threes3 := generate_p(Pat(3){{{0, 0}, {1, 1}, {0, 2}}}), generate_p(Pat(3){{{1, 0}, {0, 1}, {0, 2}}}), generate_p(Pat(3){{{0, 0}, {0, 1}, {0, 3}}})
-  copy(res[:], threes1[:])
-  copy(res[8:], threes2[:])
-  copy(res[16:], threes3[:])
+  copy_into(res[:], [][]SPat(3){threes1[:], threes2[:], threes3[:]})
   return
 }
 fours_p :: proc() -> (res: [16]SPat(4)) {
   fours1, fours2 := generate_p(Pat(4){{{0, 0}, {1, 1}, {0, 2}, {0, 3}}}), generate_p(Pat(4){{{0, 0}, {0, 1}, {1, 1}, {2, 0}}})
-  copy(res[:], fours1[:])
-  copy(res[8:], fours2[:])
+  copy_into(res[:], [][]SPat(4){fours1[:], fours2[:]})
   return
 }
 fives_p :: proc() -> (res: [16]SPat(5)) {
   fives1, fives2 := generate_p(Pat(5){{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}), generate_p(Pat(5){{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}})
-  copy(res[:], fives1[:])
-  copy(res[8:], fives2[:])
+  copy_into(res[:], [][]SPat(5){fives1[:], fives2[:]})
   return
 }
 Pair :: struct {
