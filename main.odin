@@ -66,10 +66,7 @@ sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   res.h = maxY + 1
   return
 }
-copy_into :: proc(res: $T/[]$E, slices: []T) {
-  offset := 0
-  for s in slices do offset += copy(res[offset:], s)
-}
+copy_into :: proc(res: $T/[]$E, slices: []T) {for offset := 0; s in slices do offset += copy(res[offset:], s)}
 generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
   s := rotations_p(p)
   m := mirrored_p(p)
