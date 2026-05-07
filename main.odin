@@ -819,7 +819,10 @@ check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
   return hash.crc64_iso_3306(transmute([]byte)str) & 0xff == 0
 }
 main :: proc() {
-  when ODIN_DEBUG do debug_stuff()
+  when ODIN_DEBUG {
+    context.allocator = debug_stuff_init()
+    defer debug_stuff_defer()
+  }
   Options :: struct {
     steps: int "args:name=steps",
     score: int "args:name=score",
