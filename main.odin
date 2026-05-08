@@ -1,7 +1,6 @@
 #+feature dynamic-literals
 package main
 
-import "base:intrinsics"
 import "core:bufio"
 import "core:flags"
 import "core:fmt"
@@ -521,16 +520,14 @@ LeaderboardRecord :: struct {
 Leaderboard :: distinct [dynamic]LeaderboardRecord
 delete_leaderboard :: proc(l: ^Leaderboard) {for lr in l do delete(lr.name)}
 ReadLeaderboard :: proc() -> (res: Leaderboard, ok: bool) {
+  defer free_all(context.temp_allocator)
   res = make(Leaderboard)
-  data, ok1 := os.read_entire_file("leaderboard.txt", context.allocator)
-  defer if ok1 == nil do delete(data)
+  data, ok1 := os.read_entire_file("leaderboard.txt", context.temp_allocator)
   if ok1 == nil {
-    lines := strings.split_lines(string(data))
-    defer delete(lines)
+    lines := strings.split_lines(string(data), context.temp_allocator)
     m: u64 = 0
     for line in lines {
-      parts, err := strings.split(line, ";")
-      defer if err == .None do delete(parts)
+      parts := strings.split(line, ";", context.temp_allocator) or_continue
       if len(parts) == 3 {
         lr := LeaderboardRecord{strings.clone(parts[0]), strconv.parse_int(parts[1]) or_return}
         h, ok2 := strconv.parse_u64(parts[2])
@@ -555,7 +552,8 @@ WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
     m = compute_hash(lr, m)
     fmt.sbprintf(&builder, "%s;%d;%d", lr.name, lr.score, m, newline = true)
   }
-  _ = os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
+  err := os.write_entire_file("leaderboard.txt", transmute([]u8)strings.to_string(builder))
+  if err != nil do fmt.eprintfln("Leaderboard could not be read because: %v", err)
 }
 DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
   if len(leaderboard) == 0 do return
@@ -572,12 +570,9 @@ DrawLeaderboard :: proc(leaderboard: ^Leaderboard, offset: int, place: int) {
     start_y += 30
     c := rl.BLACK
     switch i {
-    case 0:
-      c = rl.GOLD
-    case 1:
-      c = rl.GRAY
-    case 2:
-      c = rl.ORANGE
+    case 0: c = rl.GOLD
+    case 1: c = rl.GRAY
+    case 2: c = rl.ORANGE
     }
     if place == i {
       width := rl.MeasureText(text, 20)
@@ -610,20 +605,20 @@ draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool
     c := enabled ? rl.YELLOW : (button_down ? rl.DARKGRAY : rl.LIGHTGRAY)
     if text == "SOUND" {
       level := bm.volume * 200
-      rl.DrawRectangle(place.x, place.y, i32(level), 30, rl.YELLOW)
-      rl.DrawRectangle(place.x + i32(level), place.y, i32(200 - level), 30, rl.LIGHTGRAY)
+      rl.DrawRectangleV(rl.Vector2(place), {level, 30}, rl.YELLOW)
+      rl.DrawRectangleV(rl.Vector2(place + {i32(level), 0}), {200 - level, 30}, rl.LIGHTGRAY)
       if button_down {
         x := rl.GetMouseX()
         bm.volume = f32(x - place.x) / 200.0
       }
-    } else do rl.DrawRectangle(place.x, place.y, 200, 30, c)
+    } else do rl.DrawRectangleV(rl.Vector2(place), {200, 30}, c)
   } else {
     c := enabled ? rl.GOLD : rl.GRAY
     if text == "SOUND" {
       level := bm.volume * 200
-      rl.DrawRectangle(place.x, place.y, i32(level), 30, rl.GOLD)
-      rl.DrawRectangle(place.x + i32(level), place.y, i32(200 - level), 30, rl.GRAY)
-    } else do rl.DrawRectangle(place.x, place.y, 200, 30, c)
+      rl.DrawRectangleV(rl.Vector2(place), {level, 30}, rl.GOLD)
+      rl.DrawRectangleV(rl.Vector2(place + {i32(level), 0}), {200 - level, 30}, rl.GRAY)
+    } else do rl.DrawRectangleV(rl.Vector2(place), {200, 30}, c)
   }
   label := text == "SOUND" ? fmt.ctprintf("SOUND (%d)", int(bm.volume * 100)) : fmt.ctprintf("%s", text)
   width := rl.MeasureText(label, 20)
@@ -818,6 +813,7 @@ check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
   defer delete(str)
   return hash.crc64_iso_3306(transmute([]byte)str) & 0xff == 0
 }
+v2 :: proc(a: [2]i32) -> [2]f32 {return cast([2]f32)a}
 main :: proc() {
   when ODIN_DEBUG {
     context.allocator = debug_stuff_init()
@@ -831,7 +827,7 @@ main :: proc() {
   flags.parse_or_exit(&opts, os.args)
   opts.score = opts.score == 0 ? 1000 : opts.score
   opts.steps = opts.steps == 0 ? 50 : opts.steps
-  rand.reset(u64(time.time_to_unix(time.now())))
+  rand.reset(auto_cast time.time_to_unix(time.now()))
   dd :: proc() -> int {return rand.int_max(21) - 10}
   threes := threes_p()
   fours := fours_p()
@@ -843,7 +839,10 @@ main :: proc() {
   game.fours = Fours(fours)
   game.threes = Threes(threes)
   game.fives = Fives(fives)
-  defer delete_game(&game)
+  defer {
+    save(game, true)
+    delete_game(&game)
+  }
   first_click := true
   saved_row: i32 = 0
   saved_col: i32 = 0
@@ -860,12 +859,20 @@ main :: proc() {
   leaderboard_place := -1
   leaderboard, ok := ReadLeaderboard()
   if !ok {
-    fmt.println("Leaderboard is compromised")
+    fmt.println("Leaderboard is compromised or does not exist")
     leaderboard = Leaderboard{}
   }
+  defer {
+    WriteLeaderboard(&leaderboard)
+    delete_leaderboard(&leaderboard)
+    delete(leaderboard)
+  }
   flying := make([dynamic]Particle)
+  defer delete(flying)
   staying := make([dynamic]Explosion)
+  defer delete(staying)
   rl.InitAudioDevice()
+  defer rl.CloseAudioDevice()
   psound := rl.LoadSound("p.ogg")
   ksound := rl.LoadSound("k.ogg")
   if !load(&game, true) {
@@ -873,12 +880,15 @@ main :: proc() {
     input_name = true
   }
   builder := strings.builder_make()
+  defer strings.builder_destroy(&builder)
   rl.SetConfigFlags({rl.ConfigFlag.WINDOW_RESIZABLE})
   rl.InitWindow(w, h, "Tiar3")
+  defer rl.CloseWindow()
   icon := rl.LoadImage("icon.png")
   rl.SetWindowIcon(icon)
   rl.SetTargetFPS(60)
   for !rl.WindowShouldClose() {
+    defer free_all(context.temp_allocator)
     rl.SetMasterVolume(volume)
     if frame_counter == 60 do frame_counter = 0
     else do frame_counter += 1
@@ -904,29 +914,14 @@ main :: proc() {
           c: rl.Color
           s: int
           switch it.third {
-          case .NONE:
-            continue
-          case .SQUARE:
-            c = nonacid_colors ? rl.PINK : rl.RED
-            s = 4
-          case .CIRCLE:
-            c = nonacid_colors ? rl.LIME : rl.GREEN
-            s = 0
-          case .HEXAGON:
-            c = nonacid_colors ? rl.SKYBLUE : rl.BLUE
-            s = 6
-          case .TRIANGLE:
-            c = nonacid_colors ? rl.GOLD : rl.ORANGE
-            s = 3
-          case .PENTAGON:
-            c = nonacid_colors ? rl.PURPLE : rl.MAGENTA
-            s = 5
-          case .RHOMBUS:
-            c = nonacid_colors ? rl.BEIGE : rl.YELLOW
-            s = 4
-          case .BRICK:
-            c = rl.BROWN
-            s = 4
+          case .NONE: continue
+          case .SQUARE: s, c = 4, nonacid_colors ? rl.PINK : rl.RED
+          case .CIRCLE: s, c = 0, nonacid_colors ? rl.LIME : rl.GREEN
+          case .HEXAGON: s, c = 6, nonacid_colors ? rl.SKYBLUE : rl.BLUE
+          case .TRIANGLE: s, c = 3, nonacid_colors ? rl.GOLD : rl.ORANGE
+          case .PENTAGON: s, c = 5, nonacid_colors ? rl.PURPLE : rl.MAGENTA
+          case .RHOMBUS: s, c = 4, nonacid_colors ? rl.BEIGE : rl.YELLOW
+          case .BRICK: s, c = 4, rl.BROWN
           }
           append(&flying, Particle{auto_cast dd(), auto_cast dd(), auto_cast dd(), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s})
           append(&staying, Explosion{it.second, it.first, 0})
@@ -947,22 +942,14 @@ main :: proc() {
         rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.GRAY)
       }
       switch at(game.board, j, i) {
-      case .NONE:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2, 45, rl.BLACK)
-      case .SQUARE:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
-      case .CIRCLE:
-        rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
-      case .HEXAGON:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
-      case .TRIANGLE:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
-      case .PENTAGON:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
-      case .RHOMBUS:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
-      case .BRICK:
-        rl.DrawPoly({f32(pos_x + radius), f32(pos_y + radius)}, 4, f32(radius) * 1.4, 45, nonacid_colors ? rl.BROWN : rl.BEIGE)
+      case .NONE: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) * 1.2, 45, rl.BLACK)
+      case .SQUARE: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
+      case .CIRCLE: rl.DrawCircle(pos_x + radius, pos_y + radius, f32(radius) - mo, nonacid_colors ? rl.LIME : rl.GREEN)
+      case .HEXAGON: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 6, f32(radius) - mo, 0, nonacid_colors ? rl.SKYBLUE : rl.BLUE)
+      case .TRIANGLE: rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.3}, 3, f32(radius) * 1.2 - mo, -90, nonacid_colors ? rl.GOLD : rl.ORANGE)
+      case .PENTAGON: rl.DrawPoly({f32(pos_x + radius), f32(pos_y) + f32(radius) * 1.1}, 5, f32(radius) - mo, -90, nonacid_colors ? rl.PURPLE : rl.MAGENTA)
+      case .RHOMBUS: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
+      case .BRICK: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) * 1.4, 45, nonacid_colors ? rl.BROWN : rl.BEIGE)
       }
       if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
       if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
@@ -981,7 +968,7 @@ main :: proc() {
         if dx == -1 && dy == 0 || dx == 0 && dy == -1 {
           if dx == -1 do rl.DrawRectangleGradientH(pos_x + radius - (dx == -1 ? ss / 2 - 10 : 0), pos_y + radius - (dy == -1 ? ss / 2 : 10), dx == -1 ? ss / 2 : 20, dy == -1 ? ss / 2 + 10 : 20, rl.MAROON, rl.BLANK)
           else do rl.DrawRectangleGradientV(pos_x + radius - (dx == -1 ? ss / 2 : 10), pos_y + radius - (dy == -1 ? ss / 2 - 10 : 0), dx == -1 ? ss / 2 + 10 : 20, dy == -1 ? ss / 2 : 20, rl.MAROON, rl.BLANK)
-          rl.DrawPoly({f32(pos_x + radius - (dx == -1 ? ss / 2 : 0)), f32(pos_y + radius - (dy == -1 ? ss / 2 : 0))}, 3, f32(radius) - mo, dx == -1 ? 180 : 270, rl.MAROON)
+          rl.DrawPoly(v2({pos_x + radius - (dx == -1 ? ss / 2 : 0), pos_y + radius - (dy == -1 ? ss / 2 : 0)}), 3, f32(radius) - mo, dx == -1 ? 180 : 270, rl.MAROON)
         }
       }
     }
@@ -995,8 +982,7 @@ main :: proc() {
     }
     if draw_leaderboard && !input_name {
       wheel_move := rl.GetMouseWheelMove()
-      kd := rl.IsKeyPressed(rl.KeyboardKey.DOWN)
-      ku := rl.IsKeyPressed(rl.KeyboardKey.UP)
+      kd, ku := rl.IsKeyPressed(rl.KeyboardKey.DOWN), rl.IsKeyPressed(rl.KeyboardKey.UP)
       if wheel_move == 0 {
         if kd do wheel_move = -1
         if ku do wheel_move = 1
@@ -1124,18 +1110,12 @@ main :: proc() {
         case .L:
           draw_leaderboard = !draw_leaderboard
           if !draw_leaderboard do leaderboard_place = -1
-        case .P:
-          particles = !particles
-        case .M:
-          is_play_sound = !is_play_sound
-        case .H:
-          hints = !hints
-        case .A:
-          nonacid_colors = !nonacid_colors
-        case .S:
-          save(game)
-        case .O:
-          load(&game)
+        case .P: particles = !particles
+        case .M: is_play_sound = !is_play_sound
+        case .H: hints = !hints
+        case .A: nonacid_colors = !nonacid_colors
+        case .S: save(game)
+        case .O: load(&game)
         }
       }
     }
@@ -1155,16 +1135,6 @@ main :: proc() {
       new_game(&game)
       draw_leaderboard = true
     }
-    free_all(context.temp_allocator)
   }
-  save(game, true)
-  WriteLeaderboard(&leaderboard)
-  delete(flying)
-  delete(staying)
-  delete_leaderboard(&leaderboard)
-  delete(leaderboard)
-  strings.builder_destroy(&builder)
-  rl.CloseWindow()
-  rl.CloseAudioDevice()
 }
 
