@@ -814,6 +814,17 @@ check_hash :: proc(lr: LeaderboardRecord, m: u64) -> bool {
   return hash.crc64_iso_3306(transmute([]byte)str) & 0xff == 0
 }
 v2 :: proc(a: [2]i32) -> [2]f32 {return cast([2]f32)a}
+add_thing :: proc(things: ^[dynamic]$T, thing: T) {
+  found := false
+  for &t in things {
+    if t.lifetime == 0 {
+      t = thing
+      found = true
+      break
+    }
+  }
+  if !found do append(things, thing)
+}
 main :: proc() {
   when ODIN_DEBUG {
     context.allocator = debug_stuff_init()
@@ -869,8 +880,8 @@ main :: proc() {
   }
   flying := make([dynamic]Particle)
   defer delete(flying)
-  staying := make([dynamic]Explosion)
-  defer delete(staying)
+  kabooms := make([dynamic]Explosion)
+  defer delete(kabooms)
   rl.InitAudioDevice()
   defer rl.CloseAudioDevice()
   psound := rl.LoadSound("p.ogg")
@@ -909,7 +920,7 @@ main :: proc() {
           board_y += auto_cast dd()
         }
         reserve(&flying, len(flying) + len(f))
-        reserve(&staying, len(staying) + len(f))
+        reserve(&kabooms, len(kabooms) + len(f))
         for it in f {
           c: rl.Color
           s: int
@@ -923,8 +934,8 @@ main :: proc() {
           case .RHOMBUS: s, c = 4, nonacid_colors ? rl.BEIGE : rl.YELLOW
           case .BRICK: s, c = 4, rl.BROWN
           }
-          append(&flying, Particle{auto_cast dd(), auto_cast dd(), auto_cast dd(), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 0, s})
-          append(&staying, Explosion{it.second, it.first, 0})
+          add_thing(&flying, Particle{auto_cast dd(), auto_cast dd(), auto_cast dd(), f32(i32(it.second) * ss + board_x + ss / 2), f32(i32(it.first) * ss + board_y + ss / 2), 0, c, 255, s})
+          add_thing(&kabooms, Explosion{it.second, it.first, 6})
         }
       }
     }
@@ -1020,37 +1031,24 @@ main :: proc() {
     if volume >= 0.99 do volume = 1
     is_play_sound = volume != 0
     if particles {
-      new_staying := make([dynamic]Explosion)
-      reserve(&new_staying, len(staying))
-      for it in staying {
-        p := it
+      for &p in kabooms {
+        if p.lifetime == 0 do continue
         rl.DrawRectangle(board_x + i32(p.x) * ss + so, board_y + i32(p.y) * ss + so, ss - 2 * so, ss - 2 * so, rl.WHITE)
-        if p.lifetime > 6 do continue
-        p.lifetime += 1
-        append(&new_staying, p)
+        p.lifetime -= 1
       }
-      delete(staying)
-      shrink(&new_staying)
-      staying = new_staying
-      new_flying := make([dynamic]Particle)
-      reserve(&new_flying, len(flying))
-      for it in flying {
-        p := it
+      for &p in flying {
+        if p.y > auto_cast h || p.x < 0 || p.x > auto_cast w do p.lifetime = 0
+        if p.lifetime == 0 do continue
         c := p.color
-        c.a = u8(255 - p.lifetime)
+        c.a = u8(p.lifetime)
         if p.sides == 0 do rl.DrawCircle(auto_cast p.x, auto_cast p.y, auto_cast ss / 2, c)
         else do rl.DrawPoly({auto_cast p.x, auto_cast p.y}, auto_cast p.sides, auto_cast ss / 2, p.a, c)
         p.y += p.dy
-        if p.y > auto_cast h || p.x < 0 || p.x > auto_cast w || p.lifetime > 254 do continue
         p.x += p.dx
         p.a += p.da
         p.dy += 1
-        p.lifetime += 1
-        append(&new_flying, p)
+        p.lifetime -= 1
       }
-      shrink(&new_flying)
-      delete(flying)
-      flying = new_flying
     }
     rl.EndDrawing()
     outside: {
