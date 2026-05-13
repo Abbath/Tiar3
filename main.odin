@@ -29,10 +29,7 @@ Fours :: [16]SPat(4)
 Fives :: [16]SPat(5)
 shift_p :: proc(p: ^Pat($N)) {
   minX, minY := max(int), max(int)
-  for pt in p.pat {
-    minX = min(pt.x, minX)
-    minY = min(pt.y, minY)
-  }
+  for pt in p.pat do minX, minY = min(pt.x, minX), min(pt.y, minY)
   for &pt in p.pat do pt -= {minX, minY}
 }
 rotations_p :: proc(p: Pat($N)) -> (res: [4]Pat(N)) {
@@ -40,8 +37,8 @@ rotations_p :: proc(p: Pat($N)) -> (res: [4]Pat(N)) {
   for i in 1 ..< 4 {
     rotated: Pat(N)
     for j in 0 ..< N {
-      rotated.pat[j].x = res[i - 1].pat[j].y
-      rotated.pat[j].y = -res[i - 1].pat[j].x
+      rotated.pat[j].xy = res[i - 1].pat[j].yx
+      rotated.pat[j].y *= -1
     }
     shift_p(&rotated)
     res[i] = rotated
@@ -57,18 +54,13 @@ mirrored_p :: proc(p: Pat($N)) -> (m: Pat(N)) {
 sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   res.pat = p.pat
   maxX, maxY := min(int), min(int)
-  for pt in p.pat {
-    maxX = max(pt.x, maxX)
-    maxY = max(pt.y, maxY)
-  }
-  res.w = maxX + 1
-  res.h = maxY + 1
+  for pt in p.pat do maxX, maxY = max(pt.x, maxX), max(pt.y, maxY)
+  res.w, res.h = maxX + 1, maxY + 1
   return
 }
 copy_into :: proc(res: $T/[]$E, slices: []T) {for offset := 0; s in slices do offset += copy(res[offset:], s)}
 generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
-  s := rotations_p(p)
-  m := mirrored_p(p)
+  s, m := rotations_p(p), mirrored_p(p)
   r := rotations_p(m)
   res1: [8]Pat(N)
   copy_into(res1[:], [][]Pat(N){r[:], s[:]})
@@ -134,9 +126,9 @@ Tile :: enum {
 }
 coin :: proc() -> int {return rand.int_max(42) + 1}
 coin2 :: proc() -> int {return rand.int_max(69) + 1}
-uniform_dist :: proc() -> int {return rand.int_max(len(Tile) - 1) + 1}
-uniform_dist_2 :: proc(b: Board) -> int {return rand.int_max(b.w)}
-uniform_dist_3 :: proc(b: Board) -> int {return rand.int_max(b.h)}
+random_tile :: proc() -> int {return rand.int_max(len(Tile) - 1) + 1}
+random_w :: proc(b: Board) -> int {return rand.int_max(b.w)}
+random_h :: proc(b: Board) -> int {return rand.int_max(b.h)}
 make_board :: proc(w, h: int) -> (b: Board) {
   b.w = w
   b.h = h
@@ -213,13 +205,14 @@ swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
     b.magic_tiles2[{x1, y1}] = {}
   }
 }
-fill :: proc(b: ^Board) {for &x in b.board do x = Tile(uniform_dist())}
+fill :: proc(b: ^Board) {for &x in b.board do x = Tile(random_tile())}
 reasonable_coord :: proc(b: Board, i, j: int) -> bool {return i >= 0 && i < b.w && j >= 0 && j < b.h}
 remove_trios :: proc(b: ^Board) {
-  remove_i := make([dynamic]Triple)
-  defer delete(remove_i)
-  remove_j := make([dynamic]Triple)
-  defer delete(remove_j)
+  remove_i, remove_j := make([dynamic]Triple), make([dynamic]Triple)
+  defer {
+    delete(remove_i)
+    delete(remove_j)
+  }
   for i in 0 ..< b.w do for j in 0 ..< b.h {
     if at(b^, i, j) == .BRICK do continue
     offset_i, offset_j := 1, 1
@@ -232,8 +225,7 @@ remove_trios :: proc(b: ^Board) {
     i, j, offset := t.first, t.second, t.third
     b.normals += 1
     if offset == 4 {
-      j = 0
-      offset = b.h
+      j, offset = 0, b.h
       b.longers += 1
       b.normals += max(0, b.normals - 1)
     }
@@ -251,7 +243,7 @@ remove_trios :: proc(b: ^Board) {
     }
     if offset == 5 {
       for _ in 0 ..< b.w {
-        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^))
+        set_at(b, random_w(b^), random_h(b^))
         b.score += 1
       }
       b.longests += 1
@@ -262,8 +254,7 @@ remove_trios :: proc(b: ^Board) {
     i, j, offset := t.first, t.second, t.third
     b.normals += 1
     if offset == 4 {
-      i = 0
-      offset = b.w
+      i, offset = 0, b.w
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
@@ -281,7 +272,7 @@ remove_trios :: proc(b: ^Board) {
     }
     if offset == 5 {
       for _ in 0 ..< b.w {
-        set_at(b, uniform_dist_2(b^), uniform_dist_3(b^))
+        set_at(b, random_w(b^), random_h(b^))
         b.score += 1
       }
       b.longests += 1
@@ -326,7 +317,7 @@ fill_up :: proc(b: ^Board) {
       }
     }
     for k := curr_i; k >= 0; k -= 1 {
-      set_at(b, k, j, Tile(uniform_dist()))
+      set_at(b, k, j, Tile(random_tile()))
       if coin() == 1 do b.magic_tiles[{k, j}] = {}
       if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
     }
@@ -396,8 +387,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
     t := b.rm_i[len(b.rm_i) - 1]
     i, j, offset := t.first, t.second, t.third
     if offset == 4 {
-      j = 0
-      offset = b.h
+      j, offset = 0, b.h
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
@@ -409,14 +399,12 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       r := make(map[Pair]struct{})
       defer delete(r)
       for _ in 0 ..< b.w {
-        x, y: int
-        for {
-          x, y = uniform_dist_2(b^), uniform_dist_3(b^)
-          if !({x, y} in r) && at(b^, x, y) != .NONE do break
+        for do if x, y := random_w(b^), random_h(b^); ({x, y} not_in r) && at(b^, x, y) != .NONE {
+          r[{x, y}] = {}
+          remove_tile(b, x, y, &res)
+          b.score += 1
+          break
         }
-        r[{x, y}] = {}
-        remove_tile(b, x, y, &res)
-        b.score += 1
       }
       b.longests += 1
       b.normals = max(0, b.normals - 1)
@@ -429,8 +417,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
     t := b.rm_j[len(b.rm_j) - 1]
     i, j, offset := t.first, t.second, t.third
     if offset == 4 {
-      i = 0
-      offset = b.w
+      i, offset = 0, b.w
       b.longers += 1
       b.normals = max(0, b.normals - 1)
     }
@@ -442,15 +429,12 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       r := make(map[Pair]struct{})
       defer delete(r)
       for _ in 0 ..< b.w {
-        x, y: int
-        for {
-          x = uniform_dist_2(b^)
-          y = uniform_dist_3(b^)
-          if !({x, y} in r) && at(b^, x, y) != .NONE do break
+        for do if x, y := random_w(b^), random_h(b^); ({x, y} not_in r) && at(b^, x, y) != .NONE {
+          r[{x, y}] = {}
+          remove_tile(b, x, y, &res)
+          b.score += 1
+          break
         }
-        r[{x, y}] = {}
-        remove_tile(b, x, y, &res)
-        b.score += 1
       }
       b.longests += 1
       b.normals = max(0, b.normals - 1)
@@ -493,8 +477,7 @@ prepare_removals :: proc(b: ^Board) {
   clear(&b.matched_threes)
   for i in 0 ..< b.w do for j in 0 ..< b.h {
     if at(b^, i, j) == .BRICK do continue
-    val := at(b^, i, j)
-    offset_j, offset_i := 1, 1
+    val, offset_j, offset_i := at(b^, i, j), 1, 1
     for j + offset_j < b.h && val == at(b^, i, j + offset_j) do offset_j += 1
     if offset_j > 2 do append(&b.rm_i, Triple{i, j, offset_j})
     for i + offset_i < b.w && val == at(b^, i + offset_i, j) do offset_i += 1
@@ -525,8 +508,7 @@ ReadLeaderboard :: proc() -> (res: Leaderboard, ok: bool) {
   data, ok1 := os.read_entire_file("leaderboard.txt", context.temp_allocator)
   if ok1 == nil {
     lines := strings.split_lines(string(data), context.temp_allocator)
-    m: u64 = 0
-    for line in lines {
+    for m: u64 = 0; line in lines {
       parts := strings.split(line, ";", context.temp_allocator) or_continue
       if len(parts) == 3 {
         lr := LeaderboardRecord{strings.clone(parts[0]), strconv.parse_int(parts[1]) or_return}
@@ -547,8 +529,7 @@ WriteLeaderboard :: proc(leaderboard: ^Leaderboard) {
   builder := strings.builder_make()
   defer strings.builder_destroy(&builder)
   slice.sort_by(leaderboard[:], proc(a, b: LeaderboardRecord) -> bool {return a.score > b.score})
-  m: u64 = 0
-  for lr in leaderboard {
+  for m: u64 = 0; lr in leaderboard {
     m = compute_hash(lr, m)
     fmt.sbprintf(&builder, "%s;%d;%d", lr.name, lr.score, m, newline = true)
   }
@@ -598,8 +579,7 @@ ButtonMaker :: struct {
 }
 delete_button_maker :: proc(bm: ^ButtonMaker) {delete(bm.buttons)}
 draw_button :: proc(bm: ^ButtonMaker, place: [2]i32, text: string, enabled: bool) -> Button {
-  button_down := rl.IsMouseButtonDown(rl.MouseButton.LEFT)
-  pos := rl.GetMousePosition()
+  button_down, pos := rl.IsMouseButtonDown(rl.MouseButton.LEFT), rl.GetMousePosition()
   button := Button{f32(place.x), f32(place.y), f32(place.x + 200), f32(place.y + 30)}
   if in_button(pos, button) {
     c := enabled ? rl.YELLOW : (button_down ? rl.DARKGRAY : rl.LIGHTGRAY)
@@ -655,7 +635,7 @@ Game :: struct {
 }
 make_game :: proc(size: int) -> Game {
   board := make_board(size, size)
-  return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple), name = ""}
+  return Game{board = board, old_board = copy_board(board), removed_cells = make([dynamic]Triple), name = "", threes = Threes(threes_p()), fours = Fours(fours_p()), fives = Fives(fives_p())}
 }
 delete_game :: proc(g: ^Game) {
   delete(g.name)
@@ -840,16 +820,10 @@ main :: proc() {
   opts.steps = opts.steps == 0 ? 50 : opts.steps
   rand.reset(auto_cast time.time_to_unix(time.now()))
   dd :: proc() -> int {return rand.int_max(21) - 10}
-  threes := threes_p()
-  fours := fours_p()
-  fives := fives_p()
   w: i32 = 1280
   h: i32 = 800
   board_size := 16
   game := make_game(board_size)
-  game.fours = Fours(fours)
-  game.threes = Threes(threes)
-  game.fives = Fives(fives)
   defer {
     save(game, true)
     delete_game(&game)
@@ -870,7 +844,7 @@ main :: proc() {
   leaderboard_place := -1
   leaderboard, ok := ReadLeaderboard()
   if !ok {
-    fmt.println("Leaderboard is compromised or does not exist")
+    fmt.println("Leaderboard is compromised or doesn't exist")
     leaderboard = Leaderboard{}
   }
   defer {
@@ -1039,10 +1013,9 @@ main :: proc() {
       for &p in flying {
         if p.y > auto_cast h || p.x < 0 || p.x > auto_cast w do p.lifetime = 0
         if p.lifetime == 0 do continue
-        c := p.color
-        c.a = u8(p.lifetime)
-        if p.sides == 0 do rl.DrawCircle(auto_cast p.x, auto_cast p.y, auto_cast ss / 2, c)
-        else do rl.DrawPoly({auto_cast p.x, auto_cast p.y}, auto_cast p.sides, auto_cast ss / 2, p.a, c)
+        p.color.a = u8(p.lifetime)
+        if p.sides == 0 do rl.DrawCircle(auto_cast p.x, auto_cast p.y, auto_cast ss / 2, p.color)
+        else do rl.DrawPoly({auto_cast p.x, auto_cast p.y}, auto_cast p.sides, auto_cast ss / 2, p.a, p.color)
         p.y += p.dy
         p.x += p.dx
         p.a += p.da
