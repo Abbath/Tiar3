@@ -96,14 +96,15 @@ IndexedTile :: struct {
   second: int,
   third:  Tile,
 }
+PairSet :: distinct map[Pair]struct{}
 Board :: struct {
   board:            [dynamic]Tile,
   w:                int,
   h:                int,
-  matched_patterns: map[Pair]struct{},
-  matched_threes:   map[Pair]struct{},
-  magic_tiles:      map[Pair]struct{},
-  magic_tiles2:     map[Pair]struct{},
+  matched_patterns: PairSet,
+  matched_threes:   PairSet,
+  magic_tiles:      PairSet,
+  magic_tiles2:     PairSet,
   rm_i:             [dynamic]Triple,
   rm_j:             [dynamic]Triple,
   rm_b:             [dynamic]Pair,
@@ -133,10 +134,10 @@ make_board :: proc(w, h: int) -> (b: Board) {
   b.w = w
   b.h = h
   b.board = make([dynamic]Tile, w * h)
-  b.matched_patterns = make(map[Pair]struct{})
-  b.matched_threes = make(map[Pair]struct{})
-  b.magic_tiles = make(map[Pair]struct{})
-  b.magic_tiles2 = make(map[Pair]struct{})
+  b.matched_patterns = make(PairSet)
+  b.matched_threes = make(PairSet)
+  b.magic_tiles = make(PairSet)
+  b.magic_tiles2 = make(PairSet)
   b.rm_i = make([dynamic]Triple)
   b.rm_j = make([dynamic]Triple)
   b.rm_b = make([dynamic]Pair)
@@ -154,13 +155,13 @@ delete_board :: proc(b: ^Board) {
   delete(b.rm_b)
   delete(b.rm_s)
 }
-copy_set :: proc(m: map[Pair]struct{}) -> map[Pair]struct{} {
-  m1 := make(map[Pair]struct{}, len(m))
-  for k, _ in m do m1[k] = {}
-  return m1
+copy_set :: proc(m: PairSet) -> (m1: PairSet) {
+  m1 = make(PairSet, len(m))
+  for k in m do m1[k] = {}
+  return
 }
-copy_board :: proc(b: Board) -> Board {
-  b1 := make_board(b.w, b.h)
+copy_board :: proc(b: Board) -> (b1: Board) {
+  b1 = make_board(b.w, b.h)
   copy(b1.board[:], b.board[:])
   b1.score = b.score
   b1.matched_patterns = copy_set(b.matched_patterns)
@@ -170,10 +171,14 @@ copy_board :: proc(b: Board) -> Board {
   b1.longers = b.longers
   b1.longests = b.longests
   b1.crosses = b.crosses
-  return b1
+  return
 }
-at :: proc(brd: Board, a, b: int) -> Tile {return brd.board[a * brd.h + b]}
-set_at :: proc(brd: ^Board, a, b: int, v: Tile = .NONE) {brd.board[a * brd.h + b] = v}
+at_out :: proc(brd: Board, a, b: int) -> Tile {return brd.board[a * brd.h + b]}
+at_in :: proc(brd: ^Board, a, b: int) -> ^Tile {return &brd.board[a * brd.h + b]}
+at :: proc {
+  at_in,
+  at_out,
+}
 match_pattern :: proc(b: Board, x, y: int, p: SPat($N)) -> bool {
   color := at(b, x + p.pat[0].x, y + p.pat[0].y)
   if color == .BRICK do return false
@@ -184,26 +189,25 @@ match_patterns :: proc(b: ^Board, patterns: [$M]SPat($N)) {for sp in patterns do
 is_matched :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.matched_patterns}
 is_magic :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles}
 is_magic2 :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles2}
+swap_tiles :: proc(b: ^Board, a1, b1, a2, b2: int) {slice.swap(b.board[:], a1 * b.h + b1, a2 * b.h + b2)}
+handle_magic :: proc(ps: ^PairSet, x1, y1, x2, y2: int) {
+  if ({x1, y1} in ps) {
+    delete_key(ps, Pair{x1, y1})
+    ps[{x2, y2}] = {}
+  }
+}
+consume_magic :: proc(b: ^Board, ps: ^PairSet, x, y, val: int) {
+  if ({x, y} in ps) {
+    b.score += val
+    delete_key(ps, Pair{x, y})
+  }
+}
 swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
-  tmp := at(b^, x1, y1)
-  set_at(b, x1, y1, at(b^, x2, y2))
-  set_at(b, x2, y2, tmp)
-  if is_magic(b^, x1, y1) {
-    delete_key(&b.magic_tiles, Pair{x1, y1})
-    b.magic_tiles[{x2, y2}] = {}
-  }
-  if is_magic(b^, x2, y2) {
-    delete_key(&b.magic_tiles, Pair{x2, y2})
-    b.magic_tiles[{x1, y1}] = {}
-  }
-  if is_magic2(b^, x1, y1) {
-    delete_key(&b.magic_tiles2, Pair{x1, y1})
-    b.magic_tiles2[{x2, y2}] = {}
-  }
-  if is_magic2(b^, x2, y2) {
-    delete_key(&b.magic_tiles2, Pair{x2, y2})
-    b.magic_tiles2[{x1, y1}] = {}
-  }
+  swap_tiles(b, x1, y1, x2, y2)
+  handle_magic(&b.magic_tiles, x1, y1, x2, y2)
+  handle_magic(&b.magic_tiles, x2, y2, x1, y1)
+  handle_magic(&b.magic_tiles2, x1, y1, x2, y2)
+  handle_magic(&b.magic_tiles2, x2, y2, x1, y1)
 }
 fill :: proc(b: ^Board) {for &x in b.board do x = Tile(random_tile())}
 reasonable_coord :: proc(b: Board, i, j: int) -> bool {return i >= 0 && i < b.w && j >= 0 && j < b.h}
@@ -230,20 +234,14 @@ remove_trios :: proc(b: ^Board) {
       b.normals += max(0, b.normals - 1)
     }
     for jj in j ..< j + offset {
-      set_at(b, i, jj)
-      if is_magic(b^, i, jj) {
-        b.score -= 3
-        delete_key(&b.magic_tiles, Pair{i, jj})
-      }
-      if is_magic2(b^, i, jj) {
-        b.score += 3
-        delete_key(&b.magic_tiles2, Pair{i, jj})
-      }
+      at(b, i, jj)^ = .NONE
+      consume_magic(b, &b.magic_tiles, i, jj, -3)
+      consume_magic(b, &b.magic_tiles2, i, jj, 3)
       b.score += 1
     }
     if offset == 5 {
       for _ in 0 ..< b.w {
-        set_at(b, random_w(b^), random_h(b^))
+        at(b, random_w(b^), random_h(b^))^ = .NONE
         b.score += 1
       }
       b.longests += 1
@@ -259,20 +257,14 @@ remove_trios :: proc(b: ^Board) {
       b.normals = max(0, b.normals - 1)
     }
     for ii in i ..< i + offset {
-      set_at(b, ii, j)
-      if is_magic(b^, ii, j) {
-        b.score -= 3
-        delete_key(&b.magic_tiles, Pair{ii, j})
-      }
-      if is_magic2(b^, ii, j) {
-        b.score += 3
-        delete_key(&b.magic_tiles2, Pair{ii, j})
-      }
+      at(b, ii, j)^ = .NONE
+      consume_magic(b, &b.magic_tiles, ii, j, -3)
+      consume_magic(b, &b.magic_tiles2, ii, j, 3)
       b.score += 1
     }
     if offset == 5 {
       for _ in 0 ..< b.w {
-        set_at(b, random_w(b^), random_h(b^))
+        at(b, random_w(b^), random_h(b^))^ = .NONE
         b.score += 1
       }
       b.longests += 1
@@ -287,7 +279,7 @@ remove_trios :: proc(b: ^Board) {
       for m in -1 ..< 2 {
         for n in -1 ..< 2 {
           if reasonable_coord(b^, i1 + m, j1 + n) {
-            set_at(b, i1 + m, j1 + n)
+            at(b, i1 + m, j1 + n)^ = .NONE
             b.score += 1
           }
         }
@@ -304,20 +296,14 @@ fill_up :: proc(b: ^Board) {
     for curr_i < b.w - 1 && at(b^, curr_i + 1, j) == .NONE do curr_i += 1
     for k := curr_i; k >= 0; k -= 1 {
       if at(b^, k, j) != .NONE {
-        set_at(b, curr_i, j, at(b^, k, j))
-        if is_magic(b^, k, j) {
-          delete_key(&b.magic_tiles, Pair{k, j})
-          b.magic_tiles[{curr_i, j}] = {}
-        }
-        if is_magic2(b^, k, j) {
-          delete_key(&b.magic_tiles2, Pair{k, j})
-          b.magic_tiles2[{curr_i, j}] = {}
-        }
+        at(b, curr_i, j)^ = at(b^, k, j)
+        handle_magic(&b.magic_tiles, k, j, curr_i, j)
+        handle_magic(&b.magic_tiles2, k, j, curr_i, j)
         curr_i -= 1
       }
     }
     for k := curr_i; k >= 0; k -= 1 {
-      set_at(b, k, j, Tile(random_tile()))
+      at(b, k, j)^ = Tile(random_tile())
       if coin() == 1 do b.magic_tiles[{k, j}] = {}
       if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
     }
@@ -362,22 +348,16 @@ zero :: proc(b: ^Board) {
   b.crosses = 0
 }
 handle_magick :: proc(b: ^Board, i, j: int) {
-  if is_magic(b^, i, j) {
-    b.score -= 3
-    delete_key(&b.magic_tiles, Pair{i, j})
-  }
-  if is_magic2(b^, i, j) {
-    b.score += 3
-    delete_key(&b.magic_tiles2, Pair{i, j})
-  }
+  consume_magic(b, &b.magic_tiles, i, j, -3)
+  consume_magic(b, &b.magic_tiles2, i, j, 3)
 }
 remove_tile :: proc(b: ^Board, i, j: int, res: ^[dynamic]IndexedTile) {
   append(res, IndexedTile{i, j, at(b^, i, j)})
-  set_at(b, i, j)
+  at(b, i, j)^ = .NONE
   handle_magick(b, i, j)
   for k in -1 ..= 1 do for l in -1 ..= 1 do if k != l && reasonable_coord(b^, i + k, j + l) && at(b^, i + k, j + l) == .BRICK {
     append(res, IndexedTile{i + k, j + l, at(b^, i + k, j + l)})
-    set_at(b, i + k, j + l)
+    at(b, i + k, j + l)^ = .NONE
     handle_magick(b, i + k, j + l)
   }
 }
@@ -694,7 +674,7 @@ load_game :: proc(g: ^Game, h: ^os.File, auto_clear: bool = false) -> ShitPants 
   resize(&g.board.board, g.board.w * g.board.h)
   for i in 0 ..< g.board.w do for j in 0 ..< g.board.h {
     val := read_value(&r, j == g.board.h - 1 ? '\n' : ' ') or_return
-    set_at(&g.board, i, j, Tile(val))
+    at(&g.board, i, j)^ = Tile(val)
   }
   mt := read_value(&r) or_return
   clear(&g.board.magic_tiles)
