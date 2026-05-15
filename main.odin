@@ -938,7 +938,7 @@ main :: proc() {
     }
     defer delete_button_maker(&bm)
     start_y: i32 = 0
-    inc :: proc(var: ^i32, val: i32) -> i32 {
+    inc :: proc "contextless" (var: ^i32, val: i32) -> i32 {
       var^ += val
       return var^
     }
@@ -1012,34 +1012,33 @@ main :: proc() {
         }
       }
     }
-    if rl.IsKeyPressed(.ENTER) && input_name {
+    switch {
+    case rl.IsKeyPressed(.ENTER) && input_name:
       input_name = false
       delete(game.name)
       if len(strings.to_string(builder)) == 0 do game.name = strings.clone("dupa")
       else do game.name = strings.clone(strings.to_string(builder))
-    } else if rl.IsKeyPressed(.BACKSPACE) {
-      strings.pop_rune(&builder)
-    } else if !input_name {
-      for {
-        key := rl.GetKeyPressed()
-        if key == .KEY_NULL do break
-        #partial switch key {
-        case .R:
-          new_game(&game)
-          ignore_r = true
-          input_name = true
-          strings.builder_reset(&builder)
-        case .L:
-          draw_leaderboard = !draw_leaderboard
-          if !draw_leaderboard do leaderboard_place = -1
-        case .P: particles = !particles
-        case .M: is_play_sound = !is_play_sound
-        case .H: hints = !hints
-        case .A: nonacid_colors = !nonacid_colors
-        case .S: save(game)
-        case .O: load(&game)
+    case rl.IsKeyPressed(.BACKSPACE): strings.pop_rune(&builder)
+    case !input_name: for {
+          key := rl.GetKeyPressed()
+          if key == .KEY_NULL do break
+          #partial switch key {
+          case .R:
+            new_game(&game)
+            ignore_r = true
+            input_name = true
+            strings.builder_reset(&builder)
+          case .L:
+            draw_leaderboard = !draw_leaderboard
+            if !draw_leaderboard do leaderboard_place = -1
+          case .P: particles = !particles
+          case .M: is_play_sound = !is_play_sound
+          case .H: hints = !hints
+          case .A: nonacid_colors = !nonacid_colors
+          case .S: save(game)
+          case .O: load(&game)
+          }
         }
-      }
     }
     if is_finished(game, opts.steps) {
       for lr, idx in leaderboard do if lr.score < game.board.score {
