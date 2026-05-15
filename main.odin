@@ -82,29 +82,22 @@ fives_p :: proc() -> (res: [16]SPat(5)) {
   copy_into(res[:], [][]SPat(5){fives1[:], fives2[:]})
   return
 }
-Pair :: struct {
-  first:  int,
-  second: int,
-}
-Triple :: struct {
-  first:  int,
-  second: int,
-  third:  int,
-}
+Pair :: distinct [2]int
+Triple :: distinct [3]int
 IndexedTile :: struct {
   first:  int,
   second: int,
   third:  Tile,
 }
 PairSet :: distinct map[Pair]struct{}
+PairMap :: distinct map[Pair]int
 Board :: struct {
   board:            [dynamic]Tile,
   w:                int,
   h:                int,
   matched_patterns: PairSet,
   matched_threes:   PairSet,
-  magic_tiles:      PairSet,
-  magic_tiles2:     PairSet,
+  magic_tiles:      PairMap,
   rm_i:             [dynamic]Triple,
   rm_j:             [dynamic]Triple,
   rm_b:             [dynamic]Pair,
@@ -136,8 +129,7 @@ make_board :: proc(w, h: int) -> (b: Board) {
   b.board = make([dynamic]Tile, w * h)
   b.matched_patterns = make(PairSet)
   b.matched_threes = make(PairSet)
-  b.magic_tiles = make(PairSet)
-  b.magic_tiles2 = make(PairSet)
+  b.magic_tiles = make(PairMap)
   b.rm_i = make([dynamic]Triple)
   b.rm_j = make([dynamic]Triple)
   b.rm_b = make([dynamic]Pair)
@@ -149,24 +141,22 @@ delete_board :: proc(b: ^Board) {
   delete(b.matched_patterns)
   delete(b.matched_threes)
   delete(b.magic_tiles)
-  delete(b.magic_tiles2)
   delete(b.rm_i)
   delete(b.rm_j)
   delete(b.rm_b)
   delete(b.rm_s)
 }
-copy_set :: proc(m: PairSet) -> (m1: PairSet) {
-  m1 = make(PairSet, len(m))
-  for k in m do m1[k] = {}
+copy_map :: proc(m: $T) -> (m1: T) {
+  m1 = make(T, len(m))
+  for k, v in m do m1[k] = v
   return
 }
 copy_board :: proc(b: Board) -> (b1: Board) {
   b1 = make_board(b.w, b.h)
   copy(b1.board[:], b.board[:])
   b1.score = b.score
-  b1.matched_patterns = copy_set(b.matched_patterns)
-  b1.magic_tiles = copy_set(b.magic_tiles)
-  b1.magic_tiles2 = copy_set(b.magic_tiles2)
+  b1.matched_patterns = copy_map(b.matched_patterns)
+  b1.magic_tiles = copy_map(b.magic_tiles)
   b1.normals = b.normals
   b1.longers = b.longers
   b1.longests = b.longests
@@ -174,6 +164,7 @@ copy_board :: proc(b: Board) -> (b1: Board) {
   return
 }
 at_out :: proc(brd: Board, a, b: int) -> Tile {return brd.board[a * brd.h + b]}
+@(require_results)
 at_in :: proc(brd: ^Board, a, b: int) -> ^Tile {return &brd.board[a * brd.h + b]}
 at :: proc {
   at_in,
@@ -188,26 +179,23 @@ match_pattern :: proc(b: Board, x, y: int, p: SPat($N)) -> bool {
 match_patterns :: proc(b: ^Board, patterns: [$M]SPat($N)) {for sp in patterns do for i in 0 ..= b.w - sp.w do for j in 0 ..= b.h - sp.h do if match_pattern(b^, i, j, sp) do for p in sp.pat do b.matched_patterns[{i + p.x, j + p.y}] = {}}
 is_matched :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.matched_patterns}
 is_magic :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles}
-is_magic2 :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles2}
 swap_tiles :: proc(b: ^Board, a1, b1, a2, b2: int) {slice.swap(b.board[:], a1 * b.h + b1, a2 * b.h + b2)}
-handle_magic :: proc(ps: ^PairSet, x1, y1, x2, y2: int) {
-  if ({x1, y1} in ps) {
-    delete_key(ps, Pair{x1, y1})
-    ps[{x2, y2}] = {}
+handle_magic :: proc(ps: ^PairMap, p1, p2: Pair) {
+  if (p1 in ps) {
+    ps[p2] = ps[p1]
+    delete_key(ps, p1)
   }
 }
-consume_magic :: proc(b: ^Board, ps: ^PairSet, x, y, val: int) {
-  if ({x, y} in ps) {
-    b.score += val
-    delete_key(ps, Pair{x, y})
+consume_magic :: proc(b: ^Board, p: Pair) {
+  if (p in b.magic_tiles) {
+    b.score += b.magic_tiles[p]
+    delete_key(&b.magic_tiles, p)
   }
 }
 swap :: proc(b: ^Board, x1, y1, x2, y2: int) {
   swap_tiles(b, x1, y1, x2, y2)
-  handle_magic(&b.magic_tiles, x1, y1, x2, y2)
-  handle_magic(&b.magic_tiles, x2, y2, x1, y1)
-  handle_magic(&b.magic_tiles2, x1, y1, x2, y2)
-  handle_magic(&b.magic_tiles2, x2, y2, x1, y1)
+  handle_magic(&b.magic_tiles, {x1, y1}, {x2, y2})
+  handle_magic(&b.magic_tiles, {x2, y2}, {x1, y1})
 }
 fill :: proc(b: ^Board) {for &x in b.board do x = Tile(random_tile())}
 reasonable_coord :: proc(b: Board, i, j: int) -> bool {return i >= 0 && i < b.w && j >= 0 && j < b.h}
@@ -226,7 +214,7 @@ remove_trios :: proc(b: ^Board) {
     if offset_i > 2 do append(&remove_j, Triple{i, j, offset_i})
   }
   for t in remove_i {
-    i, j, offset := t.first, t.second, t.third
+    i, j, offset := t.x, t.y, t.z
     b.normals += 1
     if offset == 4 {
       j, offset = 0, b.h
@@ -235,8 +223,7 @@ remove_trios :: proc(b: ^Board) {
     }
     for jj in j ..< j + offset {
       at(b, i, jj)^ = .NONE
-      consume_magic(b, &b.magic_tiles, i, jj, -3)
-      consume_magic(b, &b.magic_tiles2, i, jj, 3)
+      consume_magic(b, {i, jj})
       b.score += 1
     }
     if offset == 5 {
@@ -249,7 +236,7 @@ remove_trios :: proc(b: ^Board) {
     }
   }
   for t in remove_j {
-    i, j, offset := t.first, t.second, t.third
+    i, j, offset := t.x, t.y, t.z
     b.normals += 1
     if offset == 4 {
       i, offset = 0, b.w
@@ -258,8 +245,7 @@ remove_trios :: proc(b: ^Board) {
     }
     for ii in i ..< i + offset {
       at(b, ii, j)^ = .NONE
-      consume_magic(b, &b.magic_tiles, ii, j, -3)
-      consume_magic(b, &b.magic_tiles2, ii, j, 3)
+      consume_magic(b, {ii, j})
       b.score += 1
     }
     if offset == 5 {
@@ -273,8 +259,8 @@ remove_trios :: proc(b: ^Board) {
   }
   for i in 0 ..< len(remove_i) do for j in 0 ..< len(remove_j) {
     t1, t2 := remove_i[i], remove_j[j]
-    i1, j1, o1 := t1.first, t1.second, t1.third
-    i2, j2, o2 := t2.first, t2.second, t2.third
+    i1, j1, o1 := t1.x, t1.y, t1.z
+    i2, j2, o2 := t2.x, t2.y, t2.z
     if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) {
       for m in -1 ..< 2 {
         for n in -1 ..< 2 {
@@ -297,15 +283,14 @@ fill_up :: proc(b: ^Board) {
     for k := curr_i; k >= 0; k -= 1 {
       if at(b^, k, j) != .NONE {
         at(b, curr_i, j)^ = at(b^, k, j)
-        handle_magic(&b.magic_tiles, k, j, curr_i, j)
-        handle_magic(&b.magic_tiles2, k, j, curr_i, j)
+        handle_magic(&b.magic_tiles, {k, j}, {curr_i, j})
         curr_i -= 1
       }
     }
     for k := curr_i; k >= 0; k -= 1 {
       at(b, k, j)^ = Tile(random_tile())
-      if coin() == 1 do b.magic_tiles[{k, j}] = {}
-      if coin2() == 1 do b.magic_tiles2[{k, j}] = {}
+      if coin() == 1 do b.magic_tiles[{k, j}] = -3
+      if coin2() == 1 do b.magic_tiles[{k, j}] = 3
     }
   }
 }
@@ -347,25 +332,21 @@ zero :: proc(b: ^Board) {
   b.longests = 0
   b.crosses = 0
 }
-handle_magick :: proc(b: ^Board, i, j: int) {
-  consume_magic(b, &b.magic_tiles, i, j, -3)
-  consume_magic(b, &b.magic_tiles2, i, j, 3)
-}
 remove_tile :: proc(b: ^Board, i, j: int, res: ^[dynamic]IndexedTile) {
   append(res, IndexedTile{i, j, at(b^, i, j)})
   at(b, i, j)^ = .NONE
-  handle_magick(b, i, j)
+  consume_magic(b, {i, j})
   for k in -1 ..= 1 do for l in -1 ..= 1 do if k != l && reasonable_coord(b^, i + k, j + l) && at(b^, i + k, j + l) == .BRICK {
     append(res, IndexedTile{i + k, j + l, at(b^, i + k, j + l)})
     at(b, i + k, j + l)^ = .NONE
-    handle_magick(b, i + k, j + l)
+    consume_magic(b, {i + k, j + l})
   }
 }
 remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   res := make([dynamic]IndexedTile)
   if len(b.rm_i) != 0 {
     t := b.rm_i[len(b.rm_i) - 1]
-    i, j, offset := t.first, t.second, t.third
+    i, j, offset := t.x, t.y, t.z
     if offset == 4 {
       j, offset = 0, b.h
       b.longers += 1
@@ -376,7 +357,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       b.score += 1
     }
     if offset == 5 {
-      r := make(map[Pair]struct{})
+      r := make(PairSet)
       defer delete(r)
       for _ in 0 ..< b.w {
         for do if x, y := random_w(b^), random_h(b^); ({x, y} not_in r) && at(b^, x, y) != .NONE {
@@ -395,7 +376,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   }
   if len(b.rm_j) != 0 {
     t := b.rm_j[len(b.rm_j) - 1]
-    i, j, offset := t.first, t.second, t.third
+    i, j, offset := t.x, t.y, t.z
     if offset == 4 {
       i, offset = 0, b.w
       b.longers += 1
@@ -406,7 +387,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
       b.score += 1
     }
     if offset == 5 {
-      r := make(map[Pair]struct{})
+      r := make(PairSet)
       defer delete(r)
       for _ in 0 ..< b.w {
         for do if x, y := random_w(b^), random_h(b^); ({x, y} not_in r) && at(b^, x, y) != .NONE {
@@ -425,7 +406,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   }
   if len(b.rm_b) != 0 {
     t := b.rm_b[len(b.rm_b) - 1]
-    i, j := t.first, t.second
+    i, j := t.x, t.y
     for m in -2 ..< 3 do for n in -2 ..< 3 do if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
       remove_tile(b, i + m, j + n, &res)
       b.score += 1
@@ -437,7 +418,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   }
   if len(b.rm_s) != 0 {
     t := b.rm_s[len(b.rm_s) - 1]
-    i, j := t.first, t.second
+    i, j := t.x, t.y
     for m in 0 ..= 1 do for n in 0 ..= 1 do if reasonable_coord(b^, i + m, j + n) && at(b^, i + m, j + n) != .NONE {
       remove_tile(b, i + m, j + n, &res)
       b.score += 1
@@ -447,7 +428,7 @@ remove_one_thing :: proc(b: ^Board) -> [dynamic]IndexedTile {
   }
   return res
 }
-sorter_factory :: proc($T: typeid) -> proc(_: T, _: T) -> bool {return proc(a, b: T) -> bool {return a.first < b.first}}
+sorter_factory :: proc($T: typeid) -> proc(_: T, _: T) -> bool {return proc(a, b: T) -> bool {return a.x < b.y}}
 prepare_removals :: proc(b: ^Board) {
   clear(&b.rm_i)
   clear(&b.rm_j)
@@ -466,8 +447,8 @@ prepare_removals :: proc(b: ^Board) {
   }
   for i in 0 ..< len(b.rm_i) do for j in 0 ..< len(b.rm_j) {
     t1, t2 := b.rm_i[i], b.rm_j[j]
-    i1, j1, o1 := t1.first, t1.second, t1.third
-    i2, j2, o2 := t2.first, t2.second, t2.third
+    i1, j1, o1 := t1.x, t1.y, t1.z
+    i2, j2, o2 := t2.x, t2.y, t2.z
     if i1 >= i2 && i1 < (i2 + o2) && j2 >= j1 && j2 < (j1 + o1) do append(&b.rm_b, Pair{i1, j2})
   }
   slice.sort_by(b.rm_i[:], sorter_factory(Triple))
@@ -643,9 +624,7 @@ save_board :: proc(b: ^strings.Builder, board: Board) {
     fmt.sbprintf(b, "\n")
   }
   fmt.sbprintf(b, "%d\n", len(board.magic_tiles))
-  for key, _ in board.magic_tiles do fmt.sbprintf(b, "%d %d ", key.first, key.second)
-  fmt.sbprintf(b, "\n%d\n", len(board.magic_tiles2))
-  for key, _ in board.magic_tiles2 do fmt.sbprintf(b, "%d %d ", key.first, key.second)
+  for key, val in board.magic_tiles do fmt.sbprintf(b, "%d %d %d ", key.x, key.y, val)
   fmt.sbprintf(b, "\n")
 }
 ShitPants :: union {
@@ -680,15 +659,9 @@ load_game :: proc(g: ^Game, h: ^os.File, auto_clear: bool = false) -> ShitPants 
   clear(&g.board.magic_tiles)
   for i in 0 ..< mt {
     x := read_value(&r, ' ') or_return
-    y := read_value(&r, i == mt - 1 ? '\n' : ' ') or_return
-    g.board.magic_tiles[{x, y}] = {}
-  }
-  mt = read_value(&r) or_return
-  clear(&g.board.magic_tiles2)
-  for i in 0 ..< mt {
-    x := read_value(&r, ' ') or_return
-    y := read_value(&r, i == mt - 1 ? '\n' : ' ') or_return
-    g.board.magic_tiles2[{x, y}] = {}
+    y := read_value(&r, ' ') or_return
+    z := read_value(&r, i == mt - 1 ? '\n' : ' ') or_return
+    g.board.magic_tiles[{x, y}] = z
   }
   if auto_clear do free_all(context.temp_allocator)
   return true
@@ -899,13 +872,12 @@ main :: proc() {
     for i in 0 ..< board_size do for j in 0 ..< board_size {
       pos_x, pos_y := board_x + auto_cast i * ss + so, board_y + auto_cast j * ss + so
       radius := (ss - 2 * so) / 2
-      if is_matched(game.board, j, i) && hints {
-        rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.DARKGRAY)
-      } else if is_three(game.board, j, i) && hints {
-        rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.LIGHTGRAY)
-      } else {
-        rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, rl.GRAY)
+      back_color := rl.GRAY
+      switch {
+      case hints && is_matched(game.board, j, i): back_color = rl.DARKGRAY
+      case hints && is_three(game.board, j, i): back_color = rl.LIGHTGRAY
       }
+      rl.DrawRectangle(pos_x, pos_y, ss - 2 * so, ss - 2 * so, back_color)
       switch at(game.board, j, i) {
       case .NONE: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) * 1.2, 45, rl.BLACK)
       case .SQUARE: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) * 1.2 - mo, 45, nonacid_colors ? rl.PINK : rl.RED)
@@ -916,8 +888,7 @@ main :: proc() {
       case .RHOMBUS: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) - mo, 0, nonacid_colors ? rl.GOLD : rl.YELLOW)
       case .BRICK: rl.DrawPoly(v2({pos_x + radius, pos_y + radius}), 4, f32(radius) * 1.4, 45, nonacid_colors ? rl.BROWN : rl.BEIGE)
       }
-      if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.BLACK)
-      if is_magic2(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, rl.DARKPURPLE)
+      if is_magic(game.board, j, i) do rl.DrawCircleGradient(pos_x + radius, pos_y + radius, f32(ss) / 6, rl.WHITE, game.board.magic_tiles[{j, i}] < 0 ? rl.BLACK : rl.DARKPURPLE)
     }
     if !first_click {
       pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
