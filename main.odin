@@ -751,8 +751,7 @@ add_thing :: proc(things: ^[dynamic]$T, thing: T) {
   found := false
   for &t in things {
     if t.lifetime == 0 {
-      t = thing
-      found = true
+      t, found = thing, true
       break
     }
   }
@@ -773,8 +772,7 @@ main :: proc() {
   opts.steps = opts.steps == 0 ? 50 : opts.steps
   rand.reset(auto_cast time.time_to_unix(time.now()))
   dd :: proc() -> int {return rand.int_max(21) - 10}
-  w: i32 = 1280
-  h: i32 = 800
+  w, h: i32 = 1280, 800
   board_size := 16
   game := make_game(board_size)
   defer {
@@ -782,8 +780,7 @@ main :: proc() {
     delete_game(&game)
   }
   first_click := true
-  saved_row: i32 = 0
-  saved_col: i32 = 0
+  saved_row, saved_col: i32 = 0, 0
   draw_leaderboard := false
   input_name := false
   frame_counter := 0
@@ -805,14 +802,14 @@ main :: proc() {
     delete_leaderboard(&leaderboard)
     delete(leaderboard)
   }
-  flying := make([dynamic]Particle)
-  defer delete(flying)
-  kabooms := make([dynamic]Explosion)
-  defer delete(kabooms)
+  flying, kabooms := make([dynamic]Particle), make([dynamic]Explosion)
+  defer {
+    delete(flying)
+    delete(kabooms)
+  }
   rl.InitAudioDevice()
   defer rl.CloseAudioDevice()
-  psound := rl.LoadSound("p.ogg")
-  ksound := rl.LoadSound("k.ogg")
+  psound, ksound := rl.LoadSound("p.ogg"), rl.LoadSound("k.ogg")
   if !load(&game, true) {
     new_game(&game)
     input_name = true
@@ -871,8 +868,7 @@ main :: proc() {
     rl.DrawRectangle(board_x, board_y, ss * auto_cast board_size, ss * auto_cast board_size, rl.BLACK)
     for i in 0 ..< board_size do for j in 0 ..< board_size {
       pos_x, pos_y := board_x + auto_cast i * ss + so, board_y + auto_cast j * ss + so
-      radius := (ss - 2 * so) / 2
-      back_color := rl.GRAY
+      radius, back_color := (ss - 2 * so) / 2, rl.GRAY
       switch {
       case hints && is_matched(game.board, j, i): back_color = rl.DARKGRAY
       case hints && is_three(game.board, j, i): back_color = rl.LIGHTGRAY
@@ -992,11 +988,8 @@ main :: proc() {
         pos = pos - {auto_cast board_x, auto_cast board_y}
         if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * auto_cast board_size) || pos.y > f32(ss * auto_cast board_size) do break outside
         row, col := i32(pos.y / auto_cast ss), i32(pos.x / auto_cast ss)
-        if first_click {
-          saved_row = row
-          saved_col = col
-          first_click = false
-        } else {
+        if first_click do saved_row, saved_col, first_click = row, col, false
+        else {
           first_click = true
           if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, row, col, saved_row, saved_col)
         }
@@ -1004,11 +997,9 @@ main :: proc() {
         pos := rl.GetMousePosition() - {f32(board_x), f32(board_y)}
         if pos.x < 0 || pos.y < 0 || pos.x > f32(ss * i32(board_size)) || pos.y > f32(ss * i32(board_size)) do break outside
         row, col := i32(pos.y / f32(ss)), i32(pos.x / f32(ss))
-        if row != saved_row || col != saved_col {
-          if !first_click {
-            first_click = true
-            if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, row, col, saved_row, saved_col)
-          }
+        if row != saved_row || col != saved_col do if !first_click {
+          first_click = true
+          if bool(int(abs(row - saved_row) == 1) ~ int(abs(col - saved_col) == 1)) do attempt_move(&game, row, col, saved_row, saved_col)
         }
       }
     }
@@ -1025,8 +1016,7 @@ main :: proc() {
           #partial switch key {
           case .R:
             new_game(&game)
-            ignore_r = true
-            input_name = true
+            ignore_r, input_name = true, true
             strings.builder_reset(&builder)
           case .L:
             draw_leaderboard = !draw_leaderboard
@@ -1043,8 +1033,7 @@ main :: proc() {
     if is_finished(game, opts.steps) {
       for lr, idx in leaderboard do if lr.score < game.board.score {
         inject_at(&leaderboard, idx, LeaderboardRecord{strings.clone(game.name), game.board.score})
-        leaderboard_place = idx
-        l_offset = max(0, idx - 4)
+        leaderboard_place, l_offset = idx, max(0, idx - 4)
         break
       }
       if leaderboard_place == -1 {
