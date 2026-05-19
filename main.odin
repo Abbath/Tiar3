@@ -27,19 +27,15 @@ SPat :: struct($N: int) {
 Threes :: [24]SPat(3)
 Fours :: [16]SPat(4)
 Fives :: [16]SPat(5)
-shift_p :: proc(p: ^Pat($N)) {
-  minX, minY := max(int), max(int)
-  for pt in p.pat do minX, minY = min(pt.x, minX), min(pt.y, minY)
+shift_p :: proc(p: ^Pat($N)) where N > 1 {
+  minX, minY := slice.reduce(p.pat[1:], p.pat[0].x, proc(a: int, b: Point) -> int {return min(a, b.x)}), slice.reduce(p.pat[1:], p.pat[0].y, proc(a: int, b: Point) -> int {return min(a, b.y)})
   for &pt in p.pat do pt -= {minX, minY}
 }
 rotations_p :: proc(p: Pat($N)) -> (res: [4]Pat(N)) {
   res[0] = p
   for i in 1 ..< 4 {
     rotated: Pat(N)
-    for j in 0 ..< N {
-      rotated.pat[j].xy = res[i - 1].pat[j].yx
-      rotated.pat[j].y *= -1
-    }
+    for j in 0 ..< N do rotated.pat[j].xy = res[i - 1].pat[j].yx * {1, -1}
     shift_p(&rotated)
     res[i] = rotated
   }
@@ -53,33 +49,31 @@ mirrored_p :: proc(p: Pat($N)) -> (m: Pat(N)) {
 }
 sized_p :: proc(p: Pat($N)) -> (res: SPat(N)) {
   res.pat = p.pat
-  maxX, maxY := min(int), min(int)
-  for pt in p.pat do maxX, maxY = max(pt.x, maxX), max(pt.y, maxY)
-  res.w, res.h = maxX + 1, maxY + 1
+  res.w, res.h = slice.reduce(res.pat[1:], res.pat[0].x, proc(a: int, b: Point) -> int {return max(a, b.x)}) + 1, slice.reduce(res.pat[1:], res.pat[0].y, proc(a: int, b: Point) -> int {return max(a, b.y)}) + 1
   return
 }
-copy_into :: proc(res: $T/[]$E, slices: []T) {for offset := 0; s in slices do offset += copy(res[offset:], s)}
+copy_many :: proc(res: $T/[]$E, slices: []T) {for offset := 0; s in slices do offset += copy(res[offset:], s)}
 generate_p :: proc(p: Pat($N)) -> (res2: [8]SPat(N)) {
   s, m := rotations_p(p), mirrored_p(p)
   r := rotations_p(m)
   res1: [8]Pat(N)
-  copy_into(res1[:], [][]Pat(N){r[:], s[:]})
+  copy_many(res1[:], [][]Pat(N){r[:], s[:]})
   for i in 0 ..< 8 do res2[i] = sized_p(res1[i])
   return
 }
 threes_p :: proc() -> (res: [24]SPat(3)) {
   threes1, threes2, threes3 := generate_p(Pat(3){{{0, 0}, {1, 1}, {0, 2}}}), generate_p(Pat(3){{{1, 0}, {0, 1}, {0, 2}}}), generate_p(Pat(3){{{0, 0}, {0, 1}, {0, 3}}})
-  copy_into(res[:], [][]SPat(3){threes1[:], threes2[:], threes3[:]})
+  copy_many(res[:], [][]SPat(3){threes1[:], threes2[:], threes3[:]})
   return
 }
 fours_p :: proc() -> (res: [16]SPat(4)) {
   fours1, fours2 := generate_p(Pat(4){{{0, 0}, {1, 1}, {0, 2}, {0, 3}}}), generate_p(Pat(4){{{0, 0}, {0, 1}, {1, 1}, {2, 0}}})
-  copy_into(res[:], [][]SPat(4){fours1[:], fours2[:]})
+  copy_many(res[:], [][]SPat(4){fours1[:], fours2[:]})
   return
 }
 fives_p :: proc() -> (res: [16]SPat(5)) {
   fives1, fives2 := generate_p(Pat(5){{{0, 0}, {0, 1}, {1, 2}, {0, 3}, {0, 4}}}), generate_p(Pat(5){{{0, 0}, {1, 1}, {1, 2}, {2, 0}, {3, 0}}})
-  copy_into(res[:], [][]SPat(5){fives1[:], fives2[:]})
+  copy_many(res[:], [][]SPat(5){fives1[:], fives2[:]})
   return
 }
 Pair :: distinct [2]int
@@ -181,13 +175,13 @@ is_matched :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.matched_patt
 is_magic :: proc(b: Board, x, y: int) -> bool {return {x, y} in b.magic_tiles}
 swap_tiles :: proc(b: ^Board, a1, b1, a2, b2: int) {slice.swap(b.board[:], a1 * b.h + b1, a2 * b.h + b2)}
 handle_magic :: proc(ps: ^PairMap, p1, p2: Pair) {
-  if (p1 in ps) {
+  if p1 in ps {
     ps[p2] = ps[p1]
     delete_key(ps, p1)
   }
 }
 consume_magic :: proc(b: ^Board, p: Pair) {
-  if (p in b.magic_tiles) {
+  if p in b.magic_tiles {
     b.score += b.magic_tiles[p]
     delete_key(&b.magic_tiles, p)
   }
